@@ -1,5 +1,6 @@
 package br.com.omnidevs.gcsn.model.post
 
+import br.com.omnidevs.gcsn.model.Label
 import br.com.omnidevs.gcsn.model.actor.Actor
 
 data class Post(
@@ -13,6 +14,6 @@ data class Post(
     val likeCount: Int = 0,
     val reply: ReplyRef? = null, // Reference to the post being replied to
     val embed: Embed? = null, // Embedded content (e.g., images, links)
-    val labels: List<androidx.media3.common.MediaItem>? = null,
+    val labels: List<Label>? = null,
     val langs: List<String>? = null
 )

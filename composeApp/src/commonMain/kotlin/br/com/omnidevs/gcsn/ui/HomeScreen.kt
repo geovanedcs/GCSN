@@ -8,12 +8,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import gcsn.composeapp.generated.resources.Res
+import gcsn.composeapp.generated.resources._logo
+import gcsn.composeapp.generated.resources.logo
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun HomeScreen(
     onLoginClick: () -> Unit,
-    onRegisterClick: () -> Unit
+    onRegisterClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -23,8 +26,8 @@ fun HomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Image(
-            painter = painterResource(id = R.drawable.logo), // Substitua "logo" pelo nome do recurso da sua logo
-            contentDescription = "Logo do Projeto",
+            painter = painterResource(Res.drawable._logo),
+            contentDescription = "GCSN",
             modifier = Modifier.size(150.dp)
         )
         Spacer(modifier = Modifier.height(32.dp))

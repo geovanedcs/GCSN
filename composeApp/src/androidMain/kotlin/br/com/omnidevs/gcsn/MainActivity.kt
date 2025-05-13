@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
+import br.com.omnidevs.gcsn.ui.HomeScreen
 import br.com.omnidevs.gcsn.ui.RegisterUserScreen
 
 class MainActivity : ComponentActivity() {
@@ -23,5 +24,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppAndroidPreview() {
     val api = BlueskyApi()
-    RegisterUserScreen(api = api)
+    HomeScreen(
+        onLoginClick = { TODO() }
+    ) { }
 }
