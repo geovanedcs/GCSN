@@ -1,5 +1,6 @@
 package br.com.omnidevs.gcsn.network.response
 
+import br.com.omnidevs.gcsn.model.actor.Actor
 import br.com.omnidevs.gcsn.model.post.Post
 import kotlinx.serialization.Serializable
 
@@ -76,13 +77,6 @@ data class SearchActorsResponse(
     val actors: List<Actor>
 )
 
-@Serializable
-data class Actor(
-    val id: String,
-    val displayName: String,
-    val handle: String,
-    val avatar: String? = null
-)
 
 @Serializable
 data class RegisterAccountResponse(

@@ -5,17 +5,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import br.com.omnidevs.gcsn.network.api.BlueskyApi
+import br.com.omnidevs.gcsn.network.api.BlueskyAuthApi
 import br.com.omnidevs.gcsn.ui.HomeScreen
+import br.com.omnidevs.gcsn.ui.LoginScreen
 import br.com.omnidevs.gcsn.ui.RegisterUserScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val api = BlueskyApi()
+        val api = BlueskyAuthApi()
 
         setContent {
-            RegisterUserScreen(api = api)
+            LoginScreen(api = api){}
         }
     }
 }
@@ -23,8 +24,8 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    val api = BlueskyApi()
-    HomeScreen(
-        onLoginClick = { TODO() }
+    val api = BlueskyAuthApi()
+    LoginScreen(
+        api = api,
     ) { }
 }
