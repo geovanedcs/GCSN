@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.omnidevs.gcsn.model.actor.Actor
 import br.com.omnidevs.gcsn.model.post.Post
-import com.seiko.imageloader.rememberImagePainter
+import coil3.compose.AsyncImage
 import gcsn.composeapp.generated.resources.Res
 import gcsn.composeapp.generated.resources.avatarMasc
 import gcsn.composeapp.generated.resources.banner
@@ -49,16 +49,17 @@ fun ProfileHeader(actor: Actor) {
     ) {
         // Banner
         if(actor.banner != null) {
-            Image(
-                painter = rememberImagePainter(actor.banner.toString()), // Substitua pelo recurso correto do banner
+            AsyncImage(
+                model = actor.banner.toString(),
                 contentDescription = "Banner",
+                placeholder = painterResource(Res.drawable.banner),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(150.dp)
             )
         } else {
             Image(
-                painter = painterResource(Res.drawable.banner), // Substitua pelo recurso correto do logo
+                painter = painterResource(Res.drawable.banner),
                 contentDescription = "Banner",
                 modifier = Modifier
                     .fillMaxWidth()
@@ -75,16 +76,17 @@ fun ProfileHeader(actor: Actor) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if(actor.avatar != null) {
-                Image(
-                    painter = rememberImagePainter(actor.avatar.toString()), // Substitua pelo recurso correto do avatar
+                AsyncImage(
+                    model = actor.avatar.toString(),
                     contentDescription = "Avatar",
+                    placeholder = painterResource(Res.drawable.avatarMasc),
                     modifier = Modifier
                         .size(100.dp)
                         .clip(CircleShape)
                 )
             } else {
                 Image(
-                    painter = painterResource(Res.drawable.avatarMasc), // Substitua pelo recurso correto do avatar
+                    painter = painterResource(Res.drawable.avatarMasc),
                     contentDescription = "Avatar",
                     modifier = Modifier
                         .size(100.dp)
