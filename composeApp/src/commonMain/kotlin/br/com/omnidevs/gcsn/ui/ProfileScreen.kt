@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.omnidevs.gcsn.model.actor.Actor
 import br.com.omnidevs.gcsn.model.post.Post
+import com.seiko.imageloader.rememberImagePainter
 import gcsn.composeapp.generated.resources.Res
 import gcsn.composeapp.generated.resources.avatarMasc
 import gcsn.composeapp.generated.resources.banner
@@ -49,7 +50,7 @@ fun ProfileHeader(actor: Actor) {
         // Banner
         if(actor.banner != null) {
             Image(
-                painter = painterResource(Res.drawable.banner), // Substitua pelo recurso correto do banner
+                painter = rememberImagePainter(actor.banner.toString()), // Substitua pelo recurso correto do banner
                 contentDescription = "Banner",
                 modifier = Modifier
                     .fillMaxWidth()
@@ -58,7 +59,7 @@ fun ProfileHeader(actor: Actor) {
         } else {
             Image(
                 painter = painterResource(Res.drawable.banner), // Substitua pelo recurso correto do logo
-                contentDescription = "Logo",
+                contentDescription = "Banner",
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(150.dp)
@@ -73,13 +74,24 @@ fun ProfileHeader(actor: Actor) {
                 .padding(top = 100.dp, start = 16.dp, end = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Image(
-                painter = painterResource(Res.drawable.avatarMasc), // Substitua pelo recurso correto do avatar
-                contentDescription = "Avatar",
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-            )
+            if(actor.avatar != null) {
+                Image(
+                    painter = rememberImagePainter(actor.avatar.toString()), // Substitua pelo recurso correto do avatar
+                    contentDescription = "Avatar",
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                )
+            } else {
+                Image(
+                    painter = painterResource(Res.drawable.avatarMasc), // Substitua pelo recurso correto do avatar
+                    contentDescription = "Avatar",
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = actor.displayName ?: actor.handle, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(text = "@${actor.handle}", fontSize = 16.sp, color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f))
