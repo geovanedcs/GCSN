@@ -1,5 +1,8 @@
 package br.com.omnidevs.gcsn.model.post
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 sealed class Embed {
     data class Images(val images: List<Image>) : Embed()
     data class External(val external: ExternalEmbed) : Embed()

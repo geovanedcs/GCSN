@@ -5,19 +5,6 @@ import br.com.omnidevs.gcsn.model.post.Post
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class GetProfileResponse(
-    val did: String,
-    val handle: String,
-    val displayName: String? = null,
-    val description: String? = null,
-    val avatar: String? = null,
-    val indexedAt: String? = null,
-    val followsCount: Int? = null,
-    val followersCount: Int? = null,
-    val postsCount: Int? = null
-)
-
-@Serializable
 data class FeedResponse(
     val feed: List<FeedPostResponse>,
     val cursor: String? = null

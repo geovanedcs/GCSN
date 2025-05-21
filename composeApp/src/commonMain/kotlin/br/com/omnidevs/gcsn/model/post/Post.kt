@@ -2,7 +2,9 @@ package br.com.omnidevs.gcsn.model.post
 
 import br.com.omnidevs.gcsn.model.Label
 import br.com.omnidevs.gcsn.model.actor.Actor
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class Post(
     val uri: String, // Unique identifier for the post
     val cid: String, // Content identifier

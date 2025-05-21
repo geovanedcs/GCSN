@@ -1,5 +1,8 @@
 package br.com.omnidevs.gcsn.model.actor
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class Actor(
     val did: String, // Decentralized Identifier (unique user ID)
     val handle: String, // User's handle (username)

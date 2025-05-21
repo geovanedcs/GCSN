@@ -1,11 +1,12 @@
 package br.com.omnidevs.gcsn.network.api
 
+import br.com.omnidevs.gcsn.model.Feed
+import br.com.omnidevs.gcsn.model.actor.Actor
 import br.com.omnidevs.gcsn.network.HttpClientProvider
 import br.com.omnidevs.gcsn.network.request.CreatePostRequest
 import br.com.omnidevs.gcsn.network.response.CreatePostResponse
 import br.com.omnidevs.gcsn.network.response.FeedResponse
 import br.com.omnidevs.gcsn.network.response.FollowResponse
-import br.com.omnidevs.gcsn.network.response.GetProfileResponse
 import br.com.omnidevs.gcsn.network.response.HandleAvailabilityResponse
 import br.com.omnidevs.gcsn.network.response.LikeResponse
 import br.com.omnidevs.gcsn.network.response.NotificationResponse
@@ -26,14 +27,14 @@ class BlueskyApi {
 
     private val client = HttpClientProvider.client
 
-    suspend fun getProfile(actor: String): GetProfileResponse {
-        return client.get("xrpc/app.bsky.actor.getProfile") {
+    suspend fun getProfile(actor: String): Actor {
+        return client.get("https://bsky.social/xrpc/app.bsky.actor.getProfile") {
             url.parameters.append("actor", actor)
         }.body()
     }
 
-    suspend fun getAuthorFeed(actor: String, limit: Int = 20, cursor: String? = null): FeedResponse {
-        return client.get("xrpc/app.bsky.feed.getAuthorFeed") {
+    suspend fun getAuthorFeed(actor: String, limit: Int = 20, cursor: String? = null): Feed {
+        return client.get("https://bsky.social/xrpc/app.bsky.feed.getAuthorFeed") {
             url.parameters.append("actor", actor)
             url.parameters.append("limit", limit.toString())
             cursor?.let { url.parameters.append("cursor", it) }
