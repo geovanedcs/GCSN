@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import br.com.omnidevs.gcsn.ui.FirstStartScreen
+import br.com.omnidevs.gcsn.ui.theme.AppTheme
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.SlideTransition
 
@@ -14,8 +15,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            Navigator(screen = FirstStartScreen){
-                SlideTransition(navigator = it)
+            AppTheme {
+                Navigator(screen = FirstStartScreen) {
+                    SlideTransition(navigator = it)
+                }
             }
         }
     }
@@ -24,7 +27,9 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    Navigator(screen = FirstStartScreen){
-        SlideTransition(navigator = it)
+    AppTheme {
+        Navigator(screen = FirstStartScreen) {
+            SlideTransition(navigator = it)
+        }
     }
 }
