@@ -49,7 +49,7 @@ class BlueskyApi {
         }.body()
     }
 
-    suspend fun getTimeline(limit: Int = 20, cursor: String? = null): FeedResponse {
+    suspend fun getTimeline(limit: Int = 20, cursor: String? = null): Feed {
         return client.get("xrpc/app.bsky.feed.getTimeline") {
             url.parameters.append("limit", limit.toString())
             cursor?.let { url.parameters.append("cursor", it) }

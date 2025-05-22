@@ -14,17 +14,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.omnidevs.gcsn.model.Feed
 import br.com.omnidevs.gcsn.model.actor.Actor
+import br.com.omnidevs.gcsn.model.actor.Author
+import br.com.omnidevs.gcsn.model.actor.AuthorViewer
+import br.com.omnidevs.gcsn.model.post.AspectRatio
+import br.com.omnidevs.gcsn.model.post.Embed
+import br.com.omnidevs.gcsn.model.post.Image
 import br.com.omnidevs.gcsn.model.post.Post
+import br.com.omnidevs.gcsn.model.post.Record
+import br.com.omnidevs.gcsn.model.post.Viewer
+import br.com.omnidevs.gcsn.ui.components.PostItem
 import cafe.adriel.voyager.core.screen.Screen
 import coil3.compose.AsyncImage
 import gcsn.composeapp.generated.resources.Res
 import gcsn.composeapp.generated.resources.avatarMasc
 import gcsn.composeapp.generated.resources.banner
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 data class ProfileScreen(
     val actor: Actor,
-//    val feed: Feed
+    val feed: Feed
 ) : Screen {
 
     @Composable
@@ -32,11 +41,11 @@ data class ProfileScreen(
         // The existing Composable content of ProfileScreen
         Column(modifier = Modifier.fillMaxSize()) {
             ProfileHeader(actor = actor)
-//            LazyColumn(modifier = Modifier.fillMaxSize()) {
-//                items(feed.posts.size) { index ->
-//                    PostItem(post = feed.posts[index])
-//                }
-//            }
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(feed.posts.size) { index ->
+                    PostItem(post = feed.posts[index])
+                }
+            }
         }
     }
 
@@ -47,7 +56,7 @@ fun ProfileHeader(actor: Actor) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp) // Consider making this dynamic or more robust
+            .height(200.dp)
     ) {
         // Banner
         if (actor.banner?.isNotEmpty() == true) {
@@ -125,20 +134,70 @@ fun ProfileStat(label: String, value: Int) {
     }
 }
 
-//@Composable
-//fun PostItem(post: Post) {
-//    Column(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .padding(16.dp)
-//    ) {
-//        Text(text = post.text, fontSize = 14.sp)
-//        Spacer(modifier = Modifier.height(8.dp))
-//        Text(
-//            text = post.createdAt, // Assuming this is a formatted date string
-//            fontSize = 12.sp,
-//            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-//        )
-//        Divider(modifier = Modifier.padding(vertical = 8.dp))
-//    }
-//}
+val previewFeed = Feed(
+    posts = listOf(
+        Post(
+            uri = "at://did:plc:byxe4z7g6lxdtlwwfkklr7a7/app.bsky.feed.post/3lppluev6fs2k",
+            cid = "bafyreie675biobjnybbrocouduwrzrthnm4flk3hicoqayfj6nvuksl6oy",
+            author = Author(
+                did = "did:plc:byxe4z7g6lxdtlwwfkklr7a7",
+                handle = "tcc-gcsn.bsky.social",
+                displayName = "",
+                avatar = "https://cdn.bsky.app/img/avatar/plain/did:plc:byxe4z7g6lxdtlwwfkklr7a7/bafkreifiqsw6lon2ysterag3ktcvq6tc2yr242vsbfwrmtccqxo2khwypq@jpeg",
+                viewer = AuthorViewer(
+                    muted = false,
+                    blockedBy = false
+                ),
+                labels = emptyList(),
+                createdAt = "2025-05-19T22:18:40.340Z"
+            ),
+            record = Record(
+                type = "app.bsky.feed.post",
+                text = "Testando post",
+                createdAt = "2025-05-21T21:57:48.426Z",
+                langs = listOf("pt")
+            ),
+            embed = Embed.ImagesView(
+                images = listOf(
+                    Image(
+                        thumb = "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:byxe4z7g6lxdtlwwfkklr7a7/bafkreigrihutgmynjyvm3cld5pg6zxey277wwv4ihihjotr76kmjytc5o4@jpeg",
+                        fullsize = "https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:byxe4z7g6lxdtlwwfkklr7a7/bafkreigrihutgmynjyvm3cld5pg6zxey277wwv4ihihjotr76kmjytc5o4@jpeg",
+                        alt = "",
+                        aspectRatio = AspectRatio(
+                            height = 1024,
+                            width = 1024
+                        )
+                    )
+                )
+            ),
+            replyCount = 0,
+            repostCount = 0,
+            likeCount = 0,
+            quoteCount = 0,
+            indexedAt = "2025-05-21T21:57:55.151Z",
+            viewer = Viewer(
+                threadMuted = false,
+                embeddingDisabled = false
+            ),
+            labels = emptyList()
+        )
+    )
+)
+val actor = Actor(
+    did = "did:plc:byxe4z7g6lxdtlwwfkklr7a7",
+    handle = "tcc-gcsn.bsky.social",
+    displayName = "",
+    avatar = "https://cdn.bsky.app/img/avatar/plain/did:plc:byxe4z7g6lxdtlwwfkklr7a7/bafkreifiqsw6lon2ysterag3ktcvq6tc2yr242vsbfwrmtccqxo2khwypq@jpeg",
+    indexedAt = "2025-05-19T22:18:40.340Z",
+    followersCount = 1,
+    followsCount = 1,
+    postsCount = 1
+)
+@Preview
+@Composable
+fun PreviewProfileScreen() {
+    ProfileScreen(
+        actor = actor,
+        feed = previewFeed
+    )
+}
