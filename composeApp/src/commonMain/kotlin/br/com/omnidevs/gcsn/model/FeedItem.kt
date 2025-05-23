@@ -1,9 +1,9 @@
 package br.com.omnidevs.gcsn.model
 
+import br.com.omnidevs.gcsn.model.post.Post
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Feed(
-    val feed: List<FeedItem>,
-    val cursor: String? = null
+data class FeedItem(
+    val post: Post
 )

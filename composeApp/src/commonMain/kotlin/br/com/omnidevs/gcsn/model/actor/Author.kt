@@ -10,5 +10,5 @@ data class Author(
     val avatar: String? = null,
     val viewer: AuthorViewer? = null,
     val labels: List<String> = emptyList(),
-    val createdAt: String? = null
+    val createdAt: String
 )

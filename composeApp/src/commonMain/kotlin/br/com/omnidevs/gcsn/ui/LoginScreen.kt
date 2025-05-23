@@ -5,12 +5,13 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
 import br.com.omnidevs.gcsn.model.actor.Actor
-import br.com.omnidevs.gcsn.model.post.Post
 import br.com.omnidevs.gcsn.network.api.AuthManager
 import br.com.omnidevs.gcsn.network.api.AuthResponse
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
@@ -30,61 +31,18 @@ object LoginScreen : Screen {
         var password by remember { mutableStateOf("") }
         var authorization by remember { mutableStateOf<AuthResponse?>(null) }
         var actor by remember { mutableStateOf<Actor?>(null) }
-        var posts by remember { mutableStateOf<Feed?>(null) }
+        var feed by remember { mutableStateOf<Feed?>(null) }
         val authApi = BlueskyAuthApi()
         val api = BlueskyApi()
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf("") }
         val coroutineScope = rememberCoroutineScope()
-        var logou by remember { mutableStateOf("") }
+        var showErrorDialog by remember { mutableStateOf(false) }
+        var errorMessageForDialog by remember { mutableStateOf<String?>(null) }
 
-        suspend fun loginBluesky(): Boolean {
-            isLoading = true
-            try {
-                val response = authApi.login(email, password)
-                if (response?.accessJwt?.isNotEmpty() == true) {
-                    authorization = response
-                    AuthManager.accessToken = authorization?.accessJwt
-                    return true
-                } else {
-                    return false
-                }
-            } catch (e: Exception) {
-                errorMessage = "Erro: ${e.message}"
-            } finally {
-                isLoading = false
-            }
-            return false
-        }
-
-        suspend fun getProfile(email: String) {
-            try {
-                val response = api.getProfile(email)
-                if (response != null) {
-                    actor = response
-                } else {
-                    //TODO handle error
-                }
-            } catch (e: Exception) {
-                errorMessage = "Erro: ${e.message}"
-            } finally {
-                isLoading = false
-            }
-        }
-
-        suspend fun getFeed(actor: String) {
-            try {
-                val response = api.getAuthorFeed(actor, 20)
-                if (response != null) {
-                    posts = response
-                } else {
-                    //TODO handle error
-                }
-            } catch (e: Exception) {
-                errorMessage = "Erro: ${e.message}"
-            } finally {
-                isLoading = false
-            }
+        fun triggerErrorDialog(message: String) {
+            errorMessageForDialog = message
+            showErrorDialog = true
         }
 
         Scaffold(
@@ -120,27 +78,35 @@ object LoginScreen : Screen {
                     visualTransformation = PasswordVisualTransformation()
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-//                Text(text = password, color = MaterialTheme.colors.error)
                 Button(
                     onClick = {
                         isLoading = true
                         coroutineScope.launch {
-                            var retorno = loginBluesky()
-                            if (!retorno) {
-                                errorMessage = "Erro ao autenticar"
-                            }
-                            if (authorization?.accessJwt?.isNotEmpty() == true) {
-                                getProfile(authorization?.handle.toString())
-//                                getFeed(authorization!!.email.toString())    // or .did, as required
-                                if (actor != null) {
-                                    navigator.replaceAll(ProfileScreen(actor!!))
+                            try {
+                                authorization = authApi.login(email, password)
+                                if (!authorization?.accessJwt.isNullOrEmpty()) {
+                                    AuthManager.accessToken = authorization?.accessJwt
                                 } else {
-                                    errorMessage = "Erro ao obter perfil ou feed"
+                                    errorMessage = "Erro ao autenticar"
+                                    errorMessageForDialog = authorization.toString()
+                                    showErrorDialog = true
                                 }
-                            } else {
+                                actor = api.getProfile(authorization?.handle.toString())
+                                if (actor!!.handle.isNotEmpty()) {
+
+                                    navigator.replaceAll(ProfileScreen(actor!!, api))
+                                } else {
+                                    errorMessage = "Erro ao obter feed"
+                                    errorMessageForDialog = feed.toString()
+                                    showErrorDialog = true
+                                }
+                                isLoading = false
+                            } catch (e: Exception) {
+                                isLoading = false
                                 errorMessage = "Erro ao autenticar"
+                                errorMessageForDialog = e.message
+                                showErrorDialog = true
                             }
-                            isLoading = false
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -149,7 +115,26 @@ object LoginScreen : Screen {
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
+            if (showErrorDialog) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showErrorDialog = false
+                        errorMessageForDialog = null
+                    },
+                    title = { Text("Erro de Login") },
+                    text = { Text(errorMessageForDialog ?: "Ocorreu um erro.") },
+                    confirmButton = {
+                        Button(onClick = {
+                            showErrorDialog = false
+                            errorMessageForDialog = null
+                        }) {
+                            Text("OK")
+                        }
+                    }
+                )
+            }
         }
     }
 }
+
 

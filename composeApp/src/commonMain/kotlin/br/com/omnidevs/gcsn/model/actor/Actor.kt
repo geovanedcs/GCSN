@@ -1,17 +1,22 @@
 package br.com.omnidevs.gcsn.model.actor
 
+import br.com.omnidevs.gcsn.model.post.Viewer
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class Actor(
-    val did: String, // Decentralized Identifier (unique user ID)
-    val handle: String, // User's handle (username)
-    val displayName: String? = null, // User's display name
-    val description: String? = null, // User's bio/description
-    val avatar: String? = null, // URL to user's avatar image
-    val banner: String? = null, // URL to user's banner image
+    val did: String,
+    val handle: String,
+    val displayName: String? = null,
+    val avatar: String? = null,
+    val associated: Associated,
+    val viewer: Viewer,
+    val labels: List<String> = emptyList(),
+    val createdAt: String,
+    val description: String? = null,
+    val indexedAt: String,
+    val banner: String? = null,
     val followersCount: Int = 0,
     val followsCount: Int = 0,
-    val postsCount: Int = 0,
-    val indexedAt: String? = null
+    val postsCount: Int = 0
 )

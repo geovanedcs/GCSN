@@ -57,6 +57,7 @@ kotlin {
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.transitions)
             implementation(libs.coil.network.ktor3)
+            implementation(libs.kotlinx.datetime)
         }
         iosMain{
             dependencies {

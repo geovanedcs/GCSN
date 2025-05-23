@@ -1,22 +1,22 @@
 package br.com.omnidevs.gcsn.model.post
 
 import br.com.omnidevs.gcsn.model.Label
-import br.com.omnidevs.gcsn.model.actor.Actor
 import br.com.omnidevs.gcsn.model.actor.Author
+import br.com.omnidevs.gcsn.model.post.embed.Embed
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class Post(
-    val uri: String, // Unique identifier for the post
-    val cid: String, // Content identifier
-    val author: Author, // The user who created the post
-    val record: Record, // The post's content
-    val embed: Embed? = null, // Embedded content (e.g., images, links)
+    val uri: String,
+    val cid: String,
+    val author: Author,
+    val record: Record,
+    val embed: Embed? = null,
     val replyCount: Int = 0,
     val repostCount: Int = 0,
     val likeCount: Int = 0,
     val quoteCount: Int = 0,
     val indexedAt: String,
-    val viewer: Viewer? = null,
-    val labels: List<Label>? = null,
+    val viewer: Viewer,
+    val labels: List<Label>? = emptyList(),
 )

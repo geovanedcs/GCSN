@@ -3,7 +3,7 @@ package br.com.omnidevs.gcsn.model.post
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ReplyRef(
-    val root: StrongRef,
-    val parent: StrongRef
+data class StrongRef(
+    val uri: String,
+    val cid: String
 )

@@ -1,6 +1,5 @@
 package br.com.omnidevs.gcsn.ui.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,7 +10,6 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,12 +19,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import br.com.omnidevs.gcsn.model.post.Embed
+import br.com.omnidevs.gcsn.model.post.embed.Embed
 import br.com.omnidevs.gcsn.model.post.Post
 import coil3.compose.AsyncImage
 import gcsn.composeapp.generated.resources.Res
-import gcsn.composeapp.generated.resources._logo
-import gcsn.composeapp.generated.resources.logo
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import kotlin.text.isNotBlank
 
@@ -75,12 +71,12 @@ fun PostItem(post: Post) {
         Spacer(modifier = Modifier.height(8.dp))
 
         val viewEmbed = post.embed
-        if(viewEmbed is Embed.ImagesView) {
+        if(viewEmbed is Embed.ImageView) {
             Spacer(modifier = Modifier.height(8.dp))
-            viewEmbed.images.firstOrNull()?.let{ viewImage ->
+            viewEmbed.images?.firstOrNull().let{ viewImage ->
                 AsyncImage(
-                    model = viewImage.thumb,
-                    contentDescription = viewImage.alt.ifEmpty { "Imagem do post" },
+                    model = viewImage?.thumb,
+                    contentDescription = viewImage?.alt?.ifEmpty { "Imagem do post" },
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 200.dp)

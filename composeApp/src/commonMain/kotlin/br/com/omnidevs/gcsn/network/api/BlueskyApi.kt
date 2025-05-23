@@ -34,11 +34,11 @@ class BlueskyApi {
     }
 
     suspend fun getAuthorFeed(actor: String, limit: Int = 20, cursor: String? = null): Feed {
-        return client.get("https://bsky.social/xrpc/app.bsky.feed.getAuthorFeed") {
+        val response = client.get("https://bsky.social/xrpc/app.bsky.feed.getAuthorFeed") {
             url.parameters.append("actor", actor)
             url.parameters.append("limit", limit.toString())
-            cursor?.let { url.parameters.append("cursor", it) }
-        }.body()
+        }
+        return response.body()
     }
 
     suspend fun createPost(authorization: String, request: CreatePostRequest): CreatePostResponse {
