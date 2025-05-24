@@ -1,4 +1,4 @@
-package br.com.omnidevs.gcsn.ui
+package br.com.omnidevs.gcsn.ui.screens
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +34,7 @@ import br.com.omnidevs.gcsn.ui.components.ProfileHeader
 import cafe.adriel.voyager.core.screen.Screen
 import kotlinx.coroutines.launch
 
-data class ProfileScreen(
+class ProfileScreen(
     val actor: Actor,
     val api: BlueskyApi,
 ) : Screen {
@@ -46,7 +46,7 @@ data class ProfileScreen(
         var isLoading by remember { mutableStateOf(true) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
 
-        MaterialTheme { // Aplicando o tema
+        MaterialTheme {
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -62,9 +62,9 @@ data class ProfileScreen(
                     )
                 }
             ) { paddingValues ->
-                Box(modifier = Modifier.padding(paddingValues)) {
+                Box(modifier = Modifier.Companion.padding(paddingValues)) {
                     LaunchedEffect(actor.did) {
-                        coroutineScope.launch{
+                        coroutineScope.launch {
                             isLoading = true
                             try {
                                 feed = api.getAuthorFeed(actor.did)
@@ -78,15 +78,15 @@ data class ProfileScreen(
 
                     if (isLoading) {
                         Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            modifier = Modifier.Companion.fillMaxSize(),
+                            contentAlignment = Alignment.Companion.Center
                         ) {
                             CircularProgressIndicator()
                         }
                     } else if (errorMessage != null) {
                         Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            modifier = Modifier.Companion.fillMaxSize(),
+                            contentAlignment = Alignment.Companion.Center
                         ) {
                             Text(
                                 text = errorMessage ?: "Erro desconhecido",
@@ -94,10 +94,10 @@ data class ProfileScreen(
                             )
                         }
                     } else {
-                        Column(modifier = Modifier.fillMaxSize()) {
+                        Column(modifier = Modifier.Companion.fillMaxSize()) {
                             ProfileHeader(actor = actor)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            Spacer(modifier = Modifier.Companion.height(16.dp))
+                            LazyColumn(modifier = Modifier.Companion.fillMaxSize()) {
                                 feed?.let { posts ->
                                     items(posts.feed.size) { index ->
                                         PostItem(post = posts.feed[index].post)
@@ -111,4 +111,3 @@ data class ProfileScreen(
         }
     }
 }
-

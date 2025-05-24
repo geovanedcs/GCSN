@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ReplyRef(
-    val root: StrongRef,
-    val parent: StrongRef
+    val cid: String,
+    val uri: String
 )

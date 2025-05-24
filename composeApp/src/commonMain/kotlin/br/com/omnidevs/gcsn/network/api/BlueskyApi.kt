@@ -5,7 +5,6 @@ import br.com.omnidevs.gcsn.model.actor.Actor
 import br.com.omnidevs.gcsn.network.HttpClientProvider
 import br.com.omnidevs.gcsn.network.request.CreatePostRequest
 import br.com.omnidevs.gcsn.network.response.CreatePostResponse
-import br.com.omnidevs.gcsn.network.response.FeedResponse
 import br.com.omnidevs.gcsn.network.response.FollowResponse
 import br.com.omnidevs.gcsn.network.response.HandleAvailabilityResponse
 import br.com.omnidevs.gcsn.network.response.LikeResponse
@@ -16,8 +15,8 @@ import br.com.omnidevs.gcsn.network.response.UnfollowResponse
 import br.com.omnidevs.gcsn.network.response.UnlikeResponse
 import io.ktor.client.call.body
 import io.ktor.client.request.get
-import io.ktor.client.request.post
 import io.ktor.client.request.header
+import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -37,6 +36,15 @@ class BlueskyApi {
         val response = client.get("https://bsky.social/xrpc/app.bsky.feed.getAuthorFeed") {
             url.parameters.append("actor", actor)
             url.parameters.append("limit", limit.toString())
+        }
+        return response.body()
+    }
+
+    suspend fun getFeed(feed: String, limit: Int = 20, cursor: String? = null): Feed {
+        val response = client.get("https://bsky.social/xrpc/app.bsky.feed.getFeed") {
+            url.parameters.append("feed", feed)
+            url.parameters.append("limit", limit.toString())
+            cursor?.let { url.parameters.append("cursor", it) }
         }
         return response.body()
     }

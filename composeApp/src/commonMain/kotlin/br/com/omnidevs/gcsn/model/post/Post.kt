@@ -4,6 +4,7 @@ import br.com.omnidevs.gcsn.model.Label
 import br.com.omnidevs.gcsn.model.actor.Author
 import br.com.omnidevs.gcsn.model.post.embed.Embed
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 @Serializable
 data class Post(
@@ -19,4 +20,6 @@ data class Post(
     val indexedAt: String,
     val viewer: Viewer,
     val labels: List<Label>? = emptyList(),
+    @SerialName("\$type") val viewType: String = "app.bsky.feed.defs#postView",
+    val threadgate: Threadgate? = null
 )

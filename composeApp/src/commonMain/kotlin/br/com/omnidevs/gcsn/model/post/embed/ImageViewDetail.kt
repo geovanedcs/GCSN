@@ -7,5 +7,5 @@ data class ImageViewDetail(
     val thumb: String? = null,
     val fullsize: String? = null,
     val alt: String? = null,
-    val aspectRatio: AspectRatio
+    val aspectRatio: AspectRatio? = null,
 )

@@ -25,5 +25,5 @@ sealed class Embed {
     data class RecordRef(val record: RecordEmbed) : Embed()
     @Serializable
     @SerialName("app.bsky.embed.recordWithMedia")
-    data class RecordWithMedia(val record: RecordEmbed, val media: Embed) : Embed()
+    data class RecordWithMedia(val record: RecordWithMediaEmbed, val media: Embed) : Embed()
 }

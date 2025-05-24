@@ -1,7 +1,14 @@
-package br.com.omnidevs.gcsn.ui
+package br.com.omnidevs.gcsn.ui.screens
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.Button
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Text
@@ -17,7 +24,7 @@ import gcsn.composeapp.generated.resources.Res
 import gcsn.composeapp.generated.resources._logo
 import org.jetbrains.compose.resources.painterResource
 
-object FirstStartScreen : Screen {
+class FirstStartScreen : Screen {
 
     @Composable
     override fun Content() {
@@ -41,7 +48,7 @@ object FirstStartScreen : Screen {
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = {
-                    navigator.push(LoginScreen)
+                    navigator.push(LoginScreen())
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -49,7 +56,7 @@ object FirstStartScreen : Screen {
             }
             Spacer(modifier = Modifier.height(16.dp))
             Button(
-                onClick = { navigator.push(LoginScreen) },
+                onClick = { navigator.push(LoginScreen()) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Cadastrar-se")

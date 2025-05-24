@@ -48,7 +48,7 @@ fun ProfileHeader(actor: Actor) {
                 contentDescription = "Banner",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
+                    .height(100.dp)
             )
         } else {
             Image(

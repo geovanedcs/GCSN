@@ -5,6 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ImageDetail(
     val alt: String? = null,
-    val aspectRatio: AspectRatio,
+    val aspectRatio: AspectRatio? = null,
     val image: Blob
 )

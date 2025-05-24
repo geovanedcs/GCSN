@@ -5,5 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Viewer(
     val threadMuted: Boolean? = null,
+    val replyDisabled: Boolean? = null,
     val embeddingDisabled: Boolean? = null
 )

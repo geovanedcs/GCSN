@@ -36,13 +36,14 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.androidx.datastore.preferences)
+            implementation(libs.androidx.security.crypto.v110alpha06)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material)
             implementation(compose.material3)
-            implementation(libs.androidx.material.icons.extended)
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
@@ -58,6 +59,7 @@ kotlin {
             implementation(libs.voyager.transitions)
             implementation(libs.coil.network.ktor3)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.multiplatform.settings.no.arg)
         }
         iosMain{
             dependencies {
@@ -100,6 +102,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.datastore.core.android)
     debugImplementation(compose.uiTooling)
 }
 

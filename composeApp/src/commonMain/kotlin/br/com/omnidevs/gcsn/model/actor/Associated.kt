@@ -7,5 +7,6 @@ data class Associated(
     val lists: Int = 0,
     val feedgens: Int = 0,
     val starterPacks: Int = 0,
-    val labeler: Boolean = false
+    val labeler: Boolean = false,
+    val chat: Chat? = null,
 )

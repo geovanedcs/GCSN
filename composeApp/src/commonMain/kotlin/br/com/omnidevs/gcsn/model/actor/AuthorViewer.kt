@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AuthorViewer(
-    val muted: Boolean,
-    val blockedBy: Boolean
+    val muted: Boolean? = null,
+    val blockedBy: Boolean? = null,
+    val threadMuted: Boolean? = null,
 )
