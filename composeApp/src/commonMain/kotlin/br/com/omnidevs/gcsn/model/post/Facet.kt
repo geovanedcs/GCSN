@@ -17,6 +17,6 @@ data class Feature(
 
 @Serializable
 data class Index(
-    val byteEnd: Int,
-    val byteStart: Int
+    val byteStart: Int,
+    val byteEnd: Int
 )

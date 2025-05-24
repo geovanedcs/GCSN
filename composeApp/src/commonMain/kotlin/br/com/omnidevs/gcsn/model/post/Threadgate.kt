@@ -21,7 +21,7 @@ data class ThreadgateList(
 @Serializable
 data class ThreadgateRecord(
     @SerialName("\$type") val type: String,
-    val allow: List<ThreadgateRule>,
+    val allow: List<ThreadgateRule>? = null,
     val createdAt: String,
     val hiddenReplies: List<String> = emptyList(),
     val post: String

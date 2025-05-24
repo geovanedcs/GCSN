@@ -134,6 +134,7 @@ class HomeScreen : Screen {
                                                     scaffoldState.snackbarHostState.showSnackbar(
                                                         "Failed to load more posts: ${e.message}"
                                                     )
+                                                    println(e.message)
                                                 } finally {
                                                     isLoading = false
                                                 }
@@ -156,7 +157,8 @@ class HomeScreen : Screen {
     ) {
         try {
             val feed =
-                api.getFeed("at://did:plc:jzecvjo2bsjptyxnfoixfnfv/app.bsky.feed.generator/aaalrki4j7sjw")
+                api.getFeed(feed = "at://did:plc:jzecvjo2bsjptyxnfoixfnfv/app.bsky.feed.generator/aaalrki4j7sjw",
+                    limit = 20)
             onSuccess(feed)
         } catch (e: Exception) {
             onError(e.message ?: "Unknown error occurred")

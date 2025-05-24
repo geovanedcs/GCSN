@@ -3,7 +3,9 @@ package br.com.omnidevs.gcsn.model.post.embed
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class RecordEmbed(
+data class ExternalView(
     val uri: String,
-    val cid: String
+    val title: String,
+    val description: String,
+    val thumb: String? = null
 )

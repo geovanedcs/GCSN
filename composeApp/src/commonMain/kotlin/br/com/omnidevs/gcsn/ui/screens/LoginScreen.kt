@@ -110,7 +110,7 @@ class LoginScreen : Screen {
                                     )
                                     actor = api.getProfile(authorization?.handle.toString())
                                     if (actor?.handle?.isNotEmpty() == true) {
-                                        navigator.replaceAll(ProfileScreen(actor!!, api))
+                                        navigator.replaceAll(HomeScreen())
                                     } else {
                                         triggerErrorDialog("Erro ao obter perfil do usuário")
                                     }
