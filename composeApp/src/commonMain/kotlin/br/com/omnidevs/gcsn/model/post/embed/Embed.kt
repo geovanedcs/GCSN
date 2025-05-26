@@ -1,5 +1,6 @@
 package br.com.omnidevs.gcsn.model.post.embed
 
+import br.com.omnidevs.gcsn.model.post.Record
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -24,23 +25,27 @@ sealed class Embed {
 
     @Serializable
     @SerialName("app.bsky.embed.external#view")
-    data class ExternalView(val external: ExternalView) : Embed()
+    data class ExternalView(val external: ExternalView?) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.recordWithMedia")
-    data class RecordWithMedia(val record: RecordWithMediaView, val media: Embed) : Embed()
+    data class RecordWithMedia(val record: RecordWithRecord, val media: Embed) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.record")
     data class RecordWithRecord(val record: RecordEmbed) : Embed()
 
     @Serializable
+    @SerialName("app.bsky.embed.record#view")
+    data class RecordView(val record: RecordViewRecord) : Embed()
+
+    @Serializable
     @SerialName("app.bsky.embed.recordWithMedia#view")
-    data class RecordWithMediaView(val record: RecordWithRecord, val media: Embed) : Embed()
+    data class RecordWithMediaView(val record: RecordView, val media: Embed) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.video")
-    data class Video(val aspectRatio: AspectRatio?, val video: VideoEmbed?) : Embed()
+    data class Video(val aspectRatio: AspectRatio?, val video: VideoBlob?) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.video#view")

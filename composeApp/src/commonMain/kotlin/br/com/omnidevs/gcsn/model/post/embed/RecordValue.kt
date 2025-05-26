@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 data class RecordValue(
     @SerialName("\$type") val type: String,
     val createdAt: String,
-    val embed: RecordEmbed? = null,
+    val embed: Embed? = null,
     val facets: List<Facet> = emptyList(),
     val text: String
 )

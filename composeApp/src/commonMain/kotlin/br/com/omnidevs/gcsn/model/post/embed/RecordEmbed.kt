@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class RecordEmbed(
-    val uri: String,
-    val cid: String
+    val cid: String,
+    val uri: String
 )
