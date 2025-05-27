@@ -10,6 +10,8 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,12 +100,12 @@ fun PostItem(post: Post) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             PostAction(
-                icon = Icons.Filled.FavoriteBorder,
+                icon = Icons.Filled.Reply,
                 count = post.replyCount,
                 contentDescription = "Replies"
             )
             PostAction(
-                icon = Icons.Filled.FavoriteBorder,
+                icon = Icons.Filled.Repeat,
                 count = post.repostCount,
                 contentDescription = "Reposts"
             )
