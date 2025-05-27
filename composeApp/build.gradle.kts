@@ -38,6 +38,7 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.androidx.datastore.preferences)
             implementation(libs.androidx.security.crypto.v110alpha06)
+            implementation(libs.accompanist.systemuicontroller)
         }
         commonMain.dependencies {
             implementation(compose.runtime)

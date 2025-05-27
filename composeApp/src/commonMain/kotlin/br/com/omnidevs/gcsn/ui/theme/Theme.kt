@@ -5,6 +5,9 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.darkColors
 import androidx.compose.material.lightColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import br.com.omnidevs.gcsn.util.SystemBarController
 
 private val DarkColorPalette = darkColors(
     primary = DarkPrimary,
@@ -37,6 +40,10 @@ fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
+    val systemBarController = remember { SystemBarController() }
+
+    systemBarController.setStatusBarColors(darkTheme)
+
     val colors = if (darkTheme) {
         DarkColorPalette
     } else {

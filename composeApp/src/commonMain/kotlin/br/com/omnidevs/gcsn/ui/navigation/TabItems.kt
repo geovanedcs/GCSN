@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,45 +76,13 @@ sealed class TabItem(
         override fun Content() {
             currentTab = this
 
-            // Estados necessários
-            var actor by remember { mutableStateOf<Actor?>(null) }
-            var isLoading by remember { mutableStateOf(true) }
-            var errorMessage by remember { mutableStateOf<String?>(null) }
-            val coroutineScope = rememberCoroutineScope()
-            val api = BlueskyApi()
+            val authService = AppDependencies.authService
+            val userData = remember { authService.getUserData() }
 
-            LaunchedEffect(Unit) {
-                coroutineScope.launch {
-                    try {
-                        val userData = AppDependencies.authService.getUserData()
-                        if (userData != null) {
-                            val profile = api.getProfile(userData.handle)
-                            actor = profile
-                        } else {
-                            errorMessage = "Usuário não autenticado"
-                        }
-                    } catch (e: Exception) {
-                        errorMessage = "Erro ao carregar perfil: ${e.message}"
-                    } finally {
-                        isLoading = false
-                    }
-                }
-            }
-
-            when {
-                isLoading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-
-                actor != null -> {
-                    ProfileScreen(actor = actor!!, api = api)
-                }
-
-                else -> {
-                    PlaceholderScreen(errorMessage ?: "Não foi possível carregar o perfil")
-                }
+            if (userData != null) {
+                ProfileScreen(handle = userData.handle)
+            } else {
+                PlaceholderScreen("Usuário não autenticado")
             }
         }
     }
@@ -120,10 +90,10 @@ sealed class TabItem(
 
 @Composable
 private fun PlaceholderScreen(message: String) {
-    androidx.compose.material3.Surface(
+    Surface(
         modifier = Modifier.fillMaxSize()
     ) {
-        androidx.compose.material3.Text(
+        Text(
             text = message,
             modifier = Modifier.padding(16.dp)
         )

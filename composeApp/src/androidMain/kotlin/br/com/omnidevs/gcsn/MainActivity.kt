@@ -11,6 +11,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.view.WindowCompat
 import br.com.omnidevs.gcsn.ui.screens.SplashScreen
 import br.com.omnidevs.gcsn.ui.theme.AppTheme
 import br.com.omnidevs.gcsn.util.AppDependencies
@@ -23,7 +24,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         ApplicationContext.initialize(this)
 
         val secureStorageProvider = SecureStorageProvider(applicationContext)

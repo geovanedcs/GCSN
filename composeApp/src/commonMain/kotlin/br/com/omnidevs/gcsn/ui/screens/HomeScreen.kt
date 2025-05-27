@@ -28,11 +28,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
+import br.com.omnidevs.gcsn.network.api.AuthManager
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.ui.components.PostItem
+import br.com.omnidevs.gcsn.ui.navigation.HideOnScrollBottomBar
+import br.com.omnidevs.gcsn.ui.navigation.TabItem
+import br.com.omnidevs.gcsn.util.AppDependencies
+import br.com.omnidevs.gcsn.util.AuthService
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.LocalNavigator
 import kotlinx.coroutines.launch
 
 class HomeScreen : Screen {
@@ -40,12 +50,27 @@ class HomeScreen : Screen {
     override fun Content() {
         val coroutineScope = rememberCoroutineScope()
         val scaffoldState = rememberScaffoldState()
-
+        val navigator = LocalNavigator.current
         var feed by remember { mutableStateOf<Feed?>(null) }
         var isLoading by remember { mutableStateOf(true) }
         var error by remember { mutableStateOf<String?>(null) }
+        var currentTab by remember { mutableStateOf<TabItem>(TabItem.HomeTab) }
 
         val blueskyApi = remember { BlueskyApi() }
+
+        val scrollConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    return Offset.Zero
+                }
+            }
+        }
+
+        val tabs = listOf(
+            TabItem.HomeTab,
+            TabItem.SearchTab,
+            TabItem.ProfileTab
+        )
 
         LaunchedEffect(Unit) {
             loadFeed(blueskyApi, onSuccess = { feed = it }, onError = { error = it })
@@ -74,9 +99,39 @@ class HomeScreen : Screen {
                         }
                     }
                 )
+            },
+            bottomBar = {
+                HideOnScrollBottomBar(
+                    tabs = tabs,
+                    currentTab = currentTab,
+                    onTabSelected = { selectedTab ->
+                        currentTab = selectedTab
+
+                        // Implementação da navegação
+                        when (selectedTab) {
+                            TabItem.HomeTab -> {
+                                // Já estamos na HomeScreen, não precisa navegar
+                            }
+                            TabItem.SearchTab -> {
+                                // Navegar para a SearchScreen
+                                navigator?.push(SearchScreen())
+                            }
+                            TabItem.ProfileTab -> {
+                                val userData = AppDependencies.authService.getUserData()
+                                navigator?.push(ProfileScreen(userData!!.handle))
+                            }
+                        }
+                    },
+                    scrollConnection = scrollConnection
+                )
             }
         ) { padding ->
-            Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .nestedScroll(scrollConnection)
+            ) {
                 when {
                     isLoading && feed == null -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -107,7 +162,9 @@ class HomeScreen : Screen {
                     }
 
                     feed != null -> {
-                        LazyColumn {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
                             items(feed!!.feed) { feedViewPost ->
                                 PostItem(post = feedViewPost.post)
                             }
@@ -157,8 +214,10 @@ class HomeScreen : Screen {
     ) {
         try {
             val feed =
-                api.getFeed(feed = "at://did:plc:jzecvjo2bsjptyxnfoixfnfv/app.bsky.feed.generator/aaalrki4j7sjw",
-                    limit = 20)
+                api.getFeed(
+                    feed = "at://did:plc:jzecvjo2bsjptyxnfoixfnfv/app.bsky.feed.generator/aaalrki4j7sjw",
+                    limit = 20
+                )
             onSuccess(feed)
         } catch (e: Exception) {
             onError(e.message ?: "Unknown error occurred")
