@@ -1,5 +1,6 @@
 package br.com.omnidevs.gcsn.model.post.embed
 
+
 import br.com.omnidevs.gcsn.model.Label
 import br.com.omnidevs.gcsn.model.actor.Author
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -7,14 +8,14 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 
-@OptIn( ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @JsonClassDiscriminator("\$type")
-sealed class RecordViewRecord {}
+sealed class ViewRecord {}
 
 @Serializable
 @SerialName("app.bsky.embed.record#viewRecord")
-data class ViewRecord(
+data class RecordViewRecord(
     val uri: String,
     val cid: String,
     val author: Author,
@@ -26,7 +27,7 @@ data class ViewRecord(
     val replyCount: Int = 0,
     val repostCount: Int = 0,
     val quoteCount: Int = 0
-) : RecordViewRecord()
+)
 
 @Serializable
 @SerialName("app.bsky.embed.record#viewBlocked")
@@ -34,14 +35,14 @@ data class ViewBlocked(
     val uri: String,
     val blocked: Boolean = true,
     val author: BlockedAuthor
-) : RecordViewRecord()
+) : ViewRecord()
 
 @Serializable
 @SerialName("app.bsky.embed.record#viewNotFound")
 data class ViewNotFound(
     val uri: String,
     val notFound: Boolean = true
-) : RecordViewRecord()
+) : ViewRecord()
 
 @Serializable
 data class BlockedAuthor(

@@ -31,7 +31,19 @@ class AuthService(private val secureStorage: SecureStorage) {
             val isValid = authApi.validateToken()
 
             if (!isValid) {
-                secureStorage.clearAll()
+                var refreshResponse = authApi.refreshToken(secureStorage.getRefreshToken() ?: "")
+                if(refreshResponse != null) {
+                    saveUserData(
+                        authToken = refreshResponse.accessJwt,
+                        refreshToken = refreshResponse.refreshJwt,
+                        did = refreshResponse.did,
+                        handle = refreshResponse.handle
+                    )
+                    AuthManager.accessToken = refreshResponse.accessJwt
+                    AuthManager.refreshToken = refreshResponse.refreshJwt
+                } else {
+                    secureStorage.clearAll()
+                }
             }
 
             return isValid

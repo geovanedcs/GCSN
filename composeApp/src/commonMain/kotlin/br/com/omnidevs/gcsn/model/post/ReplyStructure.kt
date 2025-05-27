@@ -6,6 +6,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ReplyStructure(
     val root: Post,
-    val parent: Post,
+    val parent: PostOrBlockedPost,
     val grandparentAuthor: Author? = null
 )

@@ -21,27 +21,30 @@ sealed class Embed {
 
     @Serializable
     @SerialName("app.bsky.embed.external")
-    data class External(val external: ExternalEmbed) : Embed()
+    data class External(val external: ExternalEmbed?) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.external#view")
-    data class ExternalView(val external: ExternalView?) : Embed()
+    data class ExternalView(val external: ExternalEmbedView?) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.recordWithMedia")
-    data class RecordWithMedia(val record: RecordWithRecord, val media: Embed) : Embed()
+    data class RecordWithMedia(val record: RecordWithRecord?, val media: Embed?) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.record")
-    data class RecordWithRecord(val record: RecordEmbed) : Embed()
+    data class RecordWithRecord(val record: RecordValue?) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.record#view")
-    data class RecordView(val record: RecordViewRecord) : Embed()
+    data class RecordView(val record: RecordViewRecord?) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.recordWithMedia#view")
-    data class RecordWithMediaView(val record: RecordView, val media: Embed) : Embed()
+    data class RecordWithMediaView(
+        val record: RecordViewWrapper?,
+        val media: Embed?
+    ) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.video")
@@ -50,9 +53,14 @@ sealed class Embed {
     @Serializable
     @SerialName("app.bsky.embed.video#view")
     data class VideoView(
-        val cid: String,
-        val playlist: String,
-        val thumbnail: String,
-        val aspectRatio: AspectRatio
+        val cid: String?,
+        val playlist: String?,
+        val thumbnail: String?,
+        val aspectRatio: AspectRatio?
     ) : Embed()
+
+    @Serializable
+    data class RecordViewWrapper(
+        val record: RecordViewRecord?  // This now directly points to the viewRecord
+    )
 }
