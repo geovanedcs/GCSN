@@ -8,18 +8,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Scaffold
-import androidx.compose.material.Text
-import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.rememberScaffoldState
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,24 +30,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import br.com.omnidevs.gcsn.ui.navigation.HideOnScrollBottomBar
 import br.com.omnidevs.gcsn.ui.navigation.TabItem
 import br.com.omnidevs.gcsn.util.AppDependencies
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
-import kotlinx.coroutines.launch
 
 class SearchScreen : Screen {
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val coroutineScope = rememberCoroutineScope()
-        val scaffoldState = rememberScaffoldState()
         val navigator = LocalNavigator.current
         val authService = AppDependencies.authService
         val userData = remember { authService.getUserData() }
@@ -53,13 +50,8 @@ class SearchScreen : Screen {
         var searchQuery by remember { mutableStateOf("") }
         var currentTab by remember { mutableStateOf<TabItem>(TabItem.SearchTab) }
 
-        val scrollConnection = remember {
-            object : NestedScrollConnection {
-                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                    return Offset.Zero
-                }
-            }
-        }
+        // Add scroll behavior for TopAppBar
+        val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
         val tabs = listOf(
             TabItem.HomeTab,
@@ -68,46 +60,55 @@ class SearchScreen : Screen {
         )
 
         Scaffold(
-            scaffoldState = scaffoldState,
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 TopAppBar(
                     title = { Text("Busca") },
                     navigationIcon = {
                         IconButton(onClick = { navigator?.pop() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "Voltar")
                         }
-                    }
+                    },
+                    scrollBehavior = scrollBehavior
                 )
             },
             bottomBar = {
-                HideOnScrollBottomBar(
-                    tabs = tabs,
-                    currentTab = currentTab,
-                    onTabSelected = { selectedTab ->
-                        if (selectedTab != currentTab) {
-                            when (selectedTab) {
-                                TabItem.HomeTab -> {
-                                    navigator?.pop() // Volta para a HomeScreen
+                NavigationBar {
+                    tabs.forEach { tab ->
+                        NavigationBarItem(
+                            icon = {
+                                tab.options.icon?.let { icon ->
+                                    Icon(painter = icon, contentDescription = tab.options.title)
                                 }
-                                TabItem.SearchTab -> {
-                                    // Já estamos na SearchScreen
-                                }
-                                TabItem.ProfileTab -> {
-                                    navigator?.push(ProfileScreen(handle = userData!!.handle))
+                            },
+                            label = { Text(tab.options.title) },
+                            selected = currentTab == tab,
+                            onClick = {
+                                if (tab != currentTab) {
+                                    when (tab) {
+                                        TabItem.HomeTab -> {
+                                            navigator?.push(HomeScreen())
+                                        }
+
+                                        TabItem.SearchTab -> {
+                                        }
+
+                                        TabItem.ProfileTab -> {
+                                            navigator?.push(ProfileScreen(handle = userData!!.handle))
+                                        }
+                                    }
+                                    currentTab = tab
                                 }
                             }
-                            currentTab = selectedTab
-                        }
-                    },
-                    scrollConnection = scrollConnection
-                )
+                        )
+                    }
+                }
             }
         ) { padding ->
             Box(
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .nestedScroll(scrollConnection)
             ) {
                 Column(
                     modifier = Modifier

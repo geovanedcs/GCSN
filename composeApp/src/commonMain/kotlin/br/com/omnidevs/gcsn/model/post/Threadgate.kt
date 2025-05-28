@@ -1,13 +1,15 @@
 package br.com.omnidevs.gcsn.model.post
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.JsonClassDiscriminator
 
 @Serializable
-data class Threadgate(
+data class ThreadGate(
     val uri: String,
     val cid: String,
-    val record: ThreadgateRecord,
+    val record: ThreadGateRecord,
     val lists: List<ThreadgateList> = emptyList()
 )
 
@@ -19,16 +21,28 @@ data class ThreadgateList(
 )
 
 @Serializable
-data class ThreadgateRecord(
-    @SerialName("\$type") val type: String,
-    val allow: List<ThreadgateRule>? = null,
+data class ThreadGateRecord(
+    @SerialName("\$type")
+    val type: String,
     val createdAt: String,
-    val hiddenReplies: List<String> = emptyList(),
-    val post: String
+    val post: String,
+    val allow: List<ThreadGateRule> = emptyList(),
+    val hiddenReplies: List<String> = emptyList()
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
-data class ThreadgateRule(
-    @SerialName("\$type") val type: String,
-    val list: String? = null
-)
+@JsonClassDiscriminator("\$type")
+sealed class ThreadGateRule
+
+@Serializable
+@SerialName("app.bsky.feed.threadgate#followingRule")
+data class FollowingRule(val placeholder: String? = null) : ThreadGateRule()
+
+@Serializable
+@SerialName("app.bsky.feed.threadgate#followerRule")
+data class FollowerRule(val placeholder: String? = null) : ThreadGateRule()
+
+@Serializable
+@SerialName("app.bsky.feed.threadgate#mentionRule")
+data class MentionRule(val placeholder: String? = null) : ThreadGateRule()

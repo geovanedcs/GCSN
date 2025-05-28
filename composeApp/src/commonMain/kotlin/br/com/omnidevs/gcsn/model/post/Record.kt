@@ -12,7 +12,7 @@ data class Record(
     val createdAt: String,
     val text: String,
     val facets: List<Facet>? = null,
-    val reply: Reply? = null,
+    val reply: ReplyRef? = null,
     val embed: Embed? = null,
     val langs: List<String> = emptyList(),
     val tags: List<String>? = null,

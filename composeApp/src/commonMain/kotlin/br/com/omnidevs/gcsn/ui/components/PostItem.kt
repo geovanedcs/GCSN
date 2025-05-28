@@ -2,16 +2,25 @@ package br.com.omnidevs.gcsn.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.Divider
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,12 +30,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import br.com.omnidevs.gcsn.model.post.embed.Embed
 import br.com.omnidevs.gcsn.model.post.Post
+import br.com.omnidevs.gcsn.model.post.embed.Embed
 import coil3.compose.AsyncImage
 import gcsn.composeapp.generated.resources.Res
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import kotlin.text.isNotBlank
 
 @OptIn(ExperimentalResourceApi::class)
 @Composable
@@ -43,7 +51,7 @@ fun PostItem(post: Post) {
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colors.onSurface.copy(alpha = 0.1f))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                     .clickable { },
                 contentScale = ContentScale.Crop,
             )
@@ -57,7 +65,7 @@ fun PostItem(post: Post) {
                 Text(
                     text = "@${post.author.handle}",
                     fontSize = 14.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
         }
@@ -65,20 +73,20 @@ fun PostItem(post: Post) {
         if (post.record.text.isNotBlank()) {
             Text(
                 text = post.record.text,
-                style = MaterialTheme.typography.body1,
-                color = MaterialTheme.colors.onSurface
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
         Spacer(modifier = Modifier.height(8.dp))
 
         val viewEmbed = post.embed
-        if(viewEmbed is Embed.ImageView) {
+        if (viewEmbed is Embed.ImagesView) {
             Spacer(modifier = Modifier.height(8.dp))
-            viewEmbed.images?.firstOrNull().let{ viewImage ->
+            viewEmbed.images.firstOrNull()?.let { viewImage ->
                 AsyncImage(
-                    model = viewImage?.thumb,
-                    contentDescription = viewImage?.alt?.ifEmpty { "Imagem do post" },
+                    model = viewImage.thumb,
+                    contentDescription = viewImage.alt?.ifEmpty { "Imagem do post" },
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 200.dp)
@@ -91,7 +99,7 @@ fun PostItem(post: Post) {
         Text(
             text = post.record.createdAt,
             fontSize = 12.sp,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
         Spacer(modifier = Modifier.height(8.dp))
         Row(
@@ -119,9 +127,13 @@ fun PostItem(post: Post) {
     }
 }
 
-
 @Composable
-fun PostAction(icon: androidx.compose.ui.graphics.vector.ImageVector, count: Int, contentDescription: String, tint: Color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)) {
+fun PostAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    count: Int,
+    contentDescription: String,
+    tint: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = icon,

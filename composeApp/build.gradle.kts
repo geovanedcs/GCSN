@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     id("org.jetbrains.kotlin.plugin.serialization")version "1.9.0"
+    id("org.jetbrains.kotlin.native.cocoapods")
 }
 
 kotlin {
@@ -18,7 +19,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -26,6 +27,17 @@ kotlin {
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
+            isStatic = true
+        }
+    }
+    cocoapods {
+        version = "1.0.0"
+        summary = "GCSN App"
+        homepage = "https://github.com/geovanedcs/GCSN"
+        ios.deploymentTarget = "14.1"
+        podfile = project.file("../iosApp/Podfile")
+        framework {
+            baseName = "ComposeApp"  // Same as in iOS targets
             isStatic = true
         }
     }

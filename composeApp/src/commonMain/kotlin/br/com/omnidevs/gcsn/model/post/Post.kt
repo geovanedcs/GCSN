@@ -30,7 +30,7 @@ data class Post(
     val indexedAt: String,
     val viewer: Viewer,
     val labels: List<Label>? = emptyList(),
-    val threadgate: Threadgate? = null,
+    val threadgate: ThreadGate? = null,
 ): PostOrBlockedPost
 
 @Serializable

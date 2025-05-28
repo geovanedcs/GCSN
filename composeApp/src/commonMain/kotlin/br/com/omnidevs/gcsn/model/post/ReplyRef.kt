@@ -4,6 +4,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ReplyRef(
-    val cid: String,
-    val uri: String
+    val root: PostRef,
+    val parent: PostRef
+)
+
+@Serializable
+data class PostRef(
+    val uri: String,
+    val cid: String
 )

@@ -1,5 +1,8 @@
 package br.com.omnidevs.gcsn.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -9,16 +12,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.Button
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.Scaffold
-import androidx.compose.material.Text
-import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.rememberScaffoldState
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,45 +34,35 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
-import br.com.omnidevs.gcsn.network.api.AuthManager
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.ui.components.PostItem
-import br.com.omnidevs.gcsn.ui.navigation.HideOnScrollBottomBar
 import br.com.omnidevs.gcsn.ui.navigation.TabItem
 import br.com.omnidevs.gcsn.util.AppDependencies
-import br.com.omnidevs.gcsn.util.AuthService
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import kotlinx.coroutines.launch
 
 class HomeScreen : Screen {
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val coroutineScope = rememberCoroutineScope()
-        val scaffoldState = rememberScaffoldState()
+        val snackbarHostState = remember { SnackbarHostState() }
         val navigator = LocalNavigator.current
         var feed by remember { mutableStateOf<Feed?>(null) }
         var isLoading by remember { mutableStateOf(true) }
         var error by remember { mutableStateOf<String?>(null) }
         var currentTab by remember { mutableStateOf<TabItem>(TabItem.HomeTab) }
-
         val blueskyApi = remember { BlueskyApi() }
 
-        val scrollConnection = remember {
-            object : NestedScrollConnection {
-                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                    return Offset.Zero
-                }
-            }
-        }
+        val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+        val bottomBarState = remember { derivedStateOf { scrollBehavior.state.heightOffset == 0f } }
 
         val tabs = listOf(
             TabItem.HomeTab,
@@ -78,7 +76,8 @@ class HomeScreen : Screen {
         }
 
         Scaffold(
-            scaffoldState = scaffoldState,
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { Text("Home") },
@@ -97,40 +96,53 @@ class HomeScreen : Screen {
                         }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(),
+                    scrollBehavior = scrollBehavior,
                 )
             },
             bottomBar = {
-                HideOnScrollBottomBar(
-                    tabs = tabs,
-                    currentTab = currentTab,
-                    onTabSelected = { selectedTab ->
-                        currentTab = selectedTab
+                AnimatedVisibility(
+                    visible = bottomBarState.value,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it })
+                )  {
+                    NavigationBar {
+                        tabs.forEach { tab ->
+                            NavigationBarItem(
+                                icon = {
+                                    tab.options.icon?.let { icon ->
+                                        Icon(painter = icon, contentDescription = tab.options.title)
+                                    }
+                                },
+                                label = { Text(tab.options.title) },
+                                selected = currentTab == tab,
+                                onClick = {
+                                    currentTab = tab
+                                    when (tab) {
+                                        TabItem.HomeTab -> {
+                                        }
 
-                        // Implementação da navegação
-                        when (selectedTab) {
-                            TabItem.HomeTab -> {
-                                // Já estamos na HomeScreen, não precisa navegar
-                            }
-                            TabItem.SearchTab -> {
-                                // Navegar para a SearchScreen
-                                navigator?.push(SearchScreen())
-                            }
-                            TabItem.ProfileTab -> {
-                                val userData = AppDependencies.authService.getUserData()
-                                navigator?.push(ProfileScreen(userData!!.handle))
-                            }
+                                        TabItem.SearchTab -> {
+                                            navigator?.push(SearchScreen())
+                                        }
+
+                                        TabItem.ProfileTab -> {
+                                            val userData = AppDependencies.authService.getUserData()
+                                            navigator?.push(ProfileScreen(userData!!.handle))
+                                        }
+                                    }
+                                }
+                            )
                         }
-                    },
-                    scrollConnection = scrollConnection
-                )
+                    }
+                }
             }
         ) { padding ->
             Box(
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .nestedScroll(scrollConnection)
             ) {
                 when {
                     isLoading && feed == null -> {
@@ -188,7 +200,7 @@ class HomeScreen : Screen {
                                                         cursor = nextPage.cursor
                                                     )
                                                 } catch (e: Exception) {
-                                                    scaffoldState.snackbarHostState.showSnackbar(
+                                                    snackbarHostState.showSnackbar(
                                                         "Failed to load more posts: ${e.message}"
                                                     )
                                                     println(e.message)

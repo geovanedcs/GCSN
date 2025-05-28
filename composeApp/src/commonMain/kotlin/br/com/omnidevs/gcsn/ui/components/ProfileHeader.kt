@@ -12,10 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.material3.Button
-import androidx.compose.material.Card
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +41,7 @@ fun ProfileHeader(actor: Actor) {
             .fillMaxWidth()
             .height(250.dp)
     ) {
+        // Banner image section - unchanged
         if (actor.banner?.isNotEmpty() == true) {
             AsyncImage(
                 model = actor.banner.toString(),
@@ -59,6 +59,8 @@ fun ProfileHeader(actor: Actor) {
                     .height(150.dp)
             )
         }
+
+        // Profile info section
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -101,7 +103,7 @@ fun ProfileHeader(actor: Actor) {
                 Text(
                     text = "@${actor.handle}",
                     fontSize = 16.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 actor.description?.let {
@@ -123,6 +125,7 @@ fun ProfileHeader(actor: Actor) {
             }
         }
 
+        // Edit profile text
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -131,7 +134,7 @@ fun ProfileHeader(actor: Actor) {
             Text(
                 text = "Editar perfil",
                 fontSize = 14.sp,
-                color = MaterialTheme.colors.primary,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
                     .clickable { showPopup.value = true }
@@ -139,16 +142,16 @@ fun ProfileHeader(actor: Actor) {
             )
         }
 
+        // Popup dialog
         if (showPopup.value) {
             Popup(
                 alignment = Alignment.Center,
                 onDismissRequest = { showPopup.value = false }
             ) {
-                Card(
+                ElevatedCard(
                     modifier = Modifier
                         .size(300.dp)
-                        .padding(16.dp),
-                    elevation = 8.dp
+                        .padding(16.dp)
                 ) {
                     Text("Função não implementada ainda", modifier = Modifier.padding(16.dp))
                 }
@@ -157,7 +160,6 @@ fun ProfileHeader(actor: Actor) {
     }
 }
 
-
 @Composable
 fun ProfileStat(label: String, value: Int) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -165,7 +167,7 @@ fun ProfileStat(label: String, value: Int) {
         Text(
             text = label,
             fontSize = 14.sp,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
     }
 }
