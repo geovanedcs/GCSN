@@ -4,9 +4,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class BlobResponse(val blob: Blob)
+
+@Serializable
 data class Blob(
     @SerialName("\$type") val type: String,
     val ref: Link,
     val mimeType: String,
-    val size: Int
+    val size: Long
 )
