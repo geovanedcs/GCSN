@@ -67,14 +67,14 @@ fun RegisterUserScreen(api: BlueskyApi) {
         Spacer(modifier = Modifier.height(16.dp))
         Button(
             onClick = {
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        val response = api.registerAccount(email, password, handle, inviteCode.ifEmpty { null })
-                        result = if (response.success) "Usuário criado com sucesso!" else "Erro: ${response.error}"
-                    } catch (e: Exception) {
-                        result = "Erro: ${e.message}"
-                    }
-                }
+//                CoroutineScope(Dispatchers.IO).launch {
+//                    try {
+//                        val response = api.registerAccount(email, password, handle, inviteCode.ifEmpty { null })
+//                        result = if (response.success) "Usuário criado com sucesso!" else "Erro: ${response.error}"
+//                    } catch (e: Exception) {
+//                        result = "Erro: ${e.message}"
+//                    }
+//                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {

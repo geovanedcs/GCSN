@@ -6,10 +6,15 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -76,7 +81,8 @@ class HomeScreen : Screen {
         }
 
         Scaffold(
-            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection).fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
@@ -99,6 +105,9 @@ class HomeScreen : Screen {
                     },
                     colors = TopAppBarDefaults.topAppBarColors(),
                     scrollBehavior = scrollBehavior,
+                    modifier = Modifier.windowInsetsPadding(
+                        WindowInsets.statusBars.only(WindowInsetsSides.Top)
+                    )
                 )
             },
             bottomBar = {
@@ -138,10 +147,10 @@ class HomeScreen : Screen {
                     }
                 }
             }
-        ) { padding ->
+        ) { innerPadding ->
             Box(
                 modifier = Modifier
-                    .padding(padding)
+                    .padding(innerPadding)
                     .fillMaxSize()
             ) {
                 when {
