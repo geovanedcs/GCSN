@@ -13,7 +13,6 @@ import br.com.omnidevs.gcsn.model.post.embed.ImageDetail
 import br.com.omnidevs.gcsn.network.HttpClientProvider
 import br.com.omnidevs.gcsn.util.AppDependencies
 import br.com.omnidevs.gcsn.util.AuthService
-import br.com.omnidevs.gcsn.util.ImagePickerManager
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -126,8 +125,7 @@ class BlueskyApi {
     }
 
     private suspend fun getImageBytesFromUri(imageUri: String): ByteArray {
-        val imagePickerManager = ImagePickerManager()
-        return imagePickerManager.getImageBytes(imageUri)
+        return AppDependencies.mediaContentReader.getMediaBytes(imageUri)
     }
 
     suspend fun getTimeline(limit: Int = 20, cursor: String? = null): Feed {

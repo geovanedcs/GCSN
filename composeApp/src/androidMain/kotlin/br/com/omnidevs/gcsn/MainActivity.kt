@@ -1,6 +1,5 @@
 package br.com.omnidevs.gcsn
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,11 +15,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import br.com.omnidevs.gcsn.ui.screens.SplashScreen
 import br.com.omnidevs.gcsn.ui.theme.AppTheme
+import br.com.omnidevs.gcsn.util.AndroidMediaContentReader
 import br.com.omnidevs.gcsn.util.AppDependencies
 import br.com.omnidevs.gcsn.util.ApplicationContext
 import br.com.omnidevs.gcsn.util.SecureStorageProvider
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.SlideTransition
+import dev.icerock.moko.media.picker.MediaPickerController
+import dev.icerock.moko.permissions.PermissionsController
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,8 +31,25 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        val permissionsController = PermissionsController(
+            applicationContext = applicationContext
+        )
+
+        val mediaPickerController = MediaPickerController(
+            permissionsController = permissionsController,
+            pickerFragmentTag = "MEDIA_PICKER_TAG",
+            filePickerFragmentTag = "FILE_PICKER_TAG",
+        )
+
         val secureStorageProvider = SecureStorageProvider(applicationContext)
-        AppDependencies.initialize(secureStorageProvider)
+        val mediaContentReader = AndroidMediaContentReader()
+
+        AppDependencies.initialize(
+            secureStorageProvider = secureStorageProvider,
+            mediaPickerControllerProvider = mediaPickerController,
+            mediaContentReaderProvider = mediaContentReader,
+            permissionsControllerProvider = permissionsController
+        )
 
         setContent {
             AppTheme {
@@ -48,6 +67,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+    override fun onResume() {
+        super.onResume()
+        ApplicationContext.initialize(this)
     }
 }
 

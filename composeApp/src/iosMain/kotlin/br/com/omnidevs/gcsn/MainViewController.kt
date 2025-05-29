@@ -11,20 +11,31 @@ import androidx.compose.ui.window.ComposeUIViewController
 import br.com.omnidevs.gcsn.ui.screens.SplashScreen
 import br.com.omnidevs.gcsn.ui.theme.AppTheme
 import br.com.omnidevs.gcsn.util.AppDependencies
+import br.com.omnidevs.gcsn.util.IosMediaContentReader
 import br.com.omnidevs.gcsn.util.SecureStorageProvider
 import cafe.adriel.voyager.navigator.Navigator
+import dev.icerock.moko.media.picker.ios.MediaPickerController
+import dev.icerock.moko.permissions.ios.PermissionsController
 import platform.UIKit.UIViewController
 import kotlin.experimental.ExperimentalObjCName
 
-// Add top-level function for Swift to call
 @OptIn(ExperimentalObjCName::class)
 @ObjCName(name = "createMainViewController")
 fun createMainViewController(): UIViewController {
-    return ComposeUIViewController {
+    val permissionsController = PermissionsController()
+    val mediaPickerController = MediaPickerController(permissionsController)
+
+    val viewController = ComposeUIViewController {
         val secureStorageProvider = remember { SecureStorageProvider() }
+        val mediaContentReader = remember { IosMediaContentReader() }
+        remember { mediaPickerController }
 
         LaunchedEffect(Unit) {
-            AppDependencies.initialize(secureStorageProvider)
+            AppDependencies.initialize(
+                secureStorageProvider = secureStorageProvider,
+                mediaPickerControllerProvider = mediaPickerController,
+                mediaContentReaderProvider = mediaContentReader
+            )
         }
 
         AppTheme {
@@ -35,9 +46,12 @@ fun createMainViewController(): UIViewController {
             }
         }
     }
+
+    mediaPickerController.bind(viewController)
+
+    return viewController
 }
 
-// Keep the class if needed elsewhere, but we'll primarily use the function above
 class ComposeViewControllerFactory {
     fun createComposeViewController(): UIViewController = createMainViewController()
 }

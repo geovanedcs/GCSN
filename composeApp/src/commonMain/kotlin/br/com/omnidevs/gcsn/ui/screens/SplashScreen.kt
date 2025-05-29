@@ -31,10 +31,10 @@ class SplashScreen : Screen {
                 }else{
                     try{
                        val refresh = authApi.refreshToken(userData?.refreshToken.toString())
-                        AuthManager.accessToken = refresh!!.accessJwt
-                        AuthManager.refreshToken = refresh.refreshJwt
+                        AuthManager.accessToken = refresh?.accessJwt
+                        AuthManager.refreshToken = refresh?.refreshJwt
                         authService.saveUserData(
-                            refresh.accessJwt,
+                            refresh!!.accessJwt,
                             refresh.refreshJwt,
                             did.toString(),
                             userData?.handle.toString()

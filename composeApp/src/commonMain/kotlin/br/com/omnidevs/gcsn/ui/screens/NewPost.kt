@@ -23,10 +23,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.util.AppDependencies
-import br.com.omnidevs.gcsn.util.getImagePickerManager
+import br.com.omnidevs.gcsn.model.ImageFile
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
+// import dev.icerock.moko.media.compose.rememberMediaPickerControllerFactory // Removido
+import dev.icerock.moko.media.picker.MediaPickerController
+// import dev.icerock.moko.media.MediaType // Removido se não usado
+import dev.icerock.moko.media.FileMedia
+// import dev.icerock.moko.permissions.compose.rememberPermissionsControllerFactory // Removido
+import dev.icerock.moko.permissions.DeniedException
+import dev.icerock.moko.permissions.DeniedAlwaysException
+import dev.icerock.moko.permissions.Permission
+import dev.icerock.moko.permissions.PermissionsController
 import kotlinx.coroutines.launch
 
 class CreatePostScreen : Screen {
@@ -37,25 +46,18 @@ class CreatePostScreen : Screen {
         val blueskyApi = remember { BlueskyApi() }
         var postText by remember { mutableStateOf("") }
         var isPosting by remember { mutableStateOf(false) }
-        val imagePickerManager = getImagePickerManager()
-        val selectedImages by imagePickerManager.selectedImages.collectAsState()
         val coroutineScope = rememberCoroutineScope()
         var errorMessage by remember { mutableStateOf<String?>(null) }
         val userData = remember { AppDependencies.authService.getUserData() }
         var userAvatar by remember { mutableStateOf<String?>(null) }
-        var loadingImages by remember { mutableStateOf(setOf<String>()) }
-        var failedImages by remember { mutableStateOf(setOf<String>()) }
 
-        LaunchedEffect(selectedImages) {
-            if (selectedImages.isEmpty()) {
-                errorMessage = null
-            } else {
-                println("Selected images count: ${selectedImages.size}")
-                selectedImages.forEach { image ->
-                    println("Image URI: ${image.uri}, Size: ${image.size}")
-                }
-            }
-        }
+        // Obtenha os controladores de AppDependencies
+        val mediaPickerController = remember { AppDependencies.mediaPickerController }
+        val permissionsController = remember { AppDependencies.permissionsController }
+
+        var selectedImages by remember { mutableStateOf<List<ImageFile>>(emptyList()) }
+
+        val MAX_IMAGES = 4
 
         LaunchedEffect(Unit) {
             try {
@@ -163,7 +165,6 @@ class CreatePostScreen : Screen {
                                     .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
-                                // Track loading state with separate state variables
                                 var isLoading by remember { mutableStateOf(true) }
                                 var isError by remember { mutableStateOf(false) }
 
@@ -180,7 +181,6 @@ class CreatePostScreen : Screen {
                                     onError = {
                                         isLoading = false
                                         isError = true
-                                        println("Error loading image: ${imageFile.uri}")
                                     }
                                 )
 
@@ -202,7 +202,6 @@ class CreatePostScreen : Screen {
                                     )
                                 }
 
-                                // File size indicator
                                 Text(
                                     text = "${imageFile.size / 1024} KB",
                                     color = Color.White,
@@ -212,9 +211,11 @@ class CreatePostScreen : Screen {
                                         .padding(4.dp)
                                 )
 
-                                // Remove button
                                 IconButton(
-                                    onClick = { imagePickerManager.removeImage(imageFile) },
+                                    onClick = {
+                                        selectedImages =
+                                            selectedImages.filterNot { it == imageFile }
+                                    },
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
                                         .size(32.dp)
@@ -244,12 +245,22 @@ class CreatePostScreen : Screen {
                 ) {
                     FilledTonalIconButton(
                         onClick = {
-                            errorMessage = null
-                            coroutineScope.launch {
-                                try {
-                                    imagePickerManager.pickSingleImage()
-                                } catch (e: Exception) {
-                                    errorMessage = "Erro ao selecionar imagens: ${e.message}"
+                            if (selectedImages.size >= MAX_IMAGES) {
+                                errorMessage = "Máximo de $MAX_IMAGES imagens permitidas."
+                            } else {
+                                errorMessage = null
+                                coroutineScope.launch {
+                                    pickImageAndUpdateList(
+                                        mediaPickerController = mediaPickerController, // Usando a instância de AppDependencies
+                                        permissionsController = permissionsController, // Usando a instância de AppDependencies
+                                        currentImages = selectedImages,
+                                        onImagesUpdated = { newImages ->
+                                            selectedImages = newImages
+                                        },
+                                        onError = { errorMsg ->
+                                            errorMessage = errorMsg
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -268,6 +279,90 @@ class CreatePostScreen : Screen {
                 ) {
                     CircularProgressIndicator()
                 }
+            }
+        }
+    }
+
+    private suspend fun pickImageAndUpdateList(
+        mediaPickerController: MediaPickerController,
+        permissionsController: PermissionsController,
+        currentImages: List<ImageFile>,
+        onImagesUpdated: (List<ImageFile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        println("MokoTest: pickImageAndUpdateList called")
+        try {
+            println("MokoTest: --- About to call isPermissionGranted(Permission.GALLERY) ---")
+            val isGranted = permissionsController.isPermissionGranted(Permission.GALLERY)
+            println("MokoTest: --- isPermissionGranted(Permission.GALLERY) returned: $isGranted ---")
+
+            if (!isGranted) {
+                println("MokoTest: Permission.GALLERY not granted. --- About to call providePermission(Permission.GALLERY) ---")
+                permissionsController.providePermission(Permission.GALLERY)
+                println("MokoTest: --- providePermission(Permission.GALLERY) finished. --- Checking permission again.")
+                val isGrantedAfterRequest =
+                    permissionsController.isPermissionGranted(Permission.GALLERY)
+                println("MokoTest: --- isPermissionGranted(Permission.GALLERY) after request returned: $isGrantedAfterRequest ---")
+                if (!isGrantedAfterRequest) {
+                    println("MokoTest: Permission.GALLERY still not granted after request.")
+                    onError("Permissão para acessar a galeria não foi concedida.")
+                    return
+                }
+                println("MokoTest: Permission.GALLERY granted after request.")
+            } else {
+                println("MokoTest: Permission.GALLERY already granted.")
+            }
+
+            println("MokoTest: About to call mediaPickerController.pickFiles()")
+            val fileMedia: FileMedia = mediaPickerController.pickFiles()
+            println("MokoTest: mediaPickerController.pickFiles() returned: ${fileMedia.name}, Path: ${fileMedia.path}")
+
+            val filePath = fileMedia.path
+            val fileName = fileMedia.name
+
+            val extension = fileName.substringAfterLast('.', "").lowercase()
+            val inferredMimeType = when (extension) {
+                "jpg", "jpeg" -> "image/jpeg"
+                "png" -> "image/png"
+                "gif" -> "image/gif"
+                "webp" -> "image/webp"
+                else -> null
+            }
+            println("MokoTest: File: $fileName, Extension: $extension, MimeType: $inferredMimeType")
+
+            if (inferredMimeType?.startsWith("image/") == true) {
+                val fileSize = 0L // O tamanho ainda precisa ser obtido por outros meios
+                val imageFile = ImageFile(
+                    uri = filePath,
+                    name = fileName,
+                    mimeType = inferredMimeType,
+                    size = fileSize
+                )
+                onImagesUpdated(currentImages + imageFile)
+                println("MokoTest: Image processed and updated.")
+            } else {
+                println("MokoTest: Not an image file or unknown type. Extension: .$extension, MimeType: $inferredMimeType")
+                onError("Por favor, selecione um arquivo de imagem. Extensão detectada: .$extension (Tipo MIME inferido: ${inferredMimeType ?: "desconhecido"})")
+            }
+        } catch (e: DeniedException) {
+            println("MokoTest: DeniedException: ${e.message}")
+            e.printStackTrace()
+            onError("Permissão para acessar a galeria foi negada.")
+        } catch (e: DeniedAlwaysException) {
+            println("MokoTest: DeniedAlwaysException: ${e.message}")
+            e.printStackTrace()
+            onError("Permissão para acessar a galeria foi negada permanentemente. Por favor, habilite nas configurações do app.")
+        } catch (e: Exception) {
+            println("MokoTest: Generic Exception in pickImageAndUpdateList: ${e::class.simpleName} - ${e.message}")
+            e.printStackTrace()
+            if (e.message?.contains("cancel", ignoreCase = true) == true ||
+                e::class.simpleName?.contains("Cancel", ignoreCase = true) == true ||
+                e.message?.contains("No file chosen", ignoreCase = true) == true ||
+                e.message?.contains("User cancelled", ignoreCase = true) == true
+            ) {
+                println("MokoTest: User cancelled picker or no file chosen.")
+            } else {
+                onError("Erro ao selecionar imagem: ${e.message ?: "Desconhecido"}")
             }
         }
     }

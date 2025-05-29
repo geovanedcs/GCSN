@@ -75,6 +75,8 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.material.icons.extended)
+            implementation(libs.calf.permissions)
+            implementation(libs.calf.file.picker)
         }
         iosMain{
             dependencies {
@@ -118,6 +120,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.datastore.core.android)
+    implementation(libs.androidx.fragment.ktx)
     debugImplementation(compose.uiTooling)
 }
 
