@@ -1,151 +1,152 @@
 package br.com.omnidevs.gcsn.util
 
-import android.app.Activity
-import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.MediaStore
-import androidx.annotation.RequiresExtension
+import android.provider.OpenableColumns
+import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.coroutines.resume
 
 actual class ImagePicker {
 
-    private lateinit var activity: Activity
+    // Constants
+    private val MAX_IMAGE_SIZE_BYTES = 1024 * 1024 // 1MB
+    private val MAX_IMAGES_PER_POST = 4
 
-    actual constructor() {
-        throw IllegalStateException("É necessário fornecer uma Activity para o ImagePicker")
-    }
+    // Launchers
+    private var pickImagesLauncher: ActivityResultLauncher<String>? = null
+    private var pickSingleImageLauncher: ActivityResultLauncher<String>? = null
 
-    constructor(activity: Activity) {
-        this.activity = activity
-    }
+    // Continuations
+    private var pickImagesContinuation: ((List<Uri>) -> Unit)? = null
+    private var pickSingleImageContinuation: ((Uri?) -> Unit)? = null
 
-    @RequiresExtension(extension = Build.VERSION_CODES.R, version = 2)
-    actual suspend fun pickImages(): List<ImageFile> = suspendCancellableCoroutine { continuation ->
-        val intent = Intent(MediaStore.ACTION_PICK_IMAGES).apply {
-            putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, 10)
-        }
+    actual constructor()
 
-        // Cria um ActivityResultListener temporário
-        val resultCallback = object : ActivityResultCallback {
-            override fun onActivityResult(resultCode: Int, data: Intent?) {
-                activity.removeActivityResultListener(this)
-
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    val selectedImages = mutableListOf<ImageFile>()
-
-                    // Processar múltiplas imagens
-                    val clipData = data.clipData
-                    if (clipData != null) {
-                        for (i in 0 until clipData.itemCount) {
-                            val uri = clipData.getItemAt(i).uri
-                            val imageFile = getImageFileFromUri(uri)
-                            if (imageFile != null) {
-                                selectedImages.add(imageFile)
-                            }
-                        }
-                    } else if (data.data != null) {
-                        // Processar uma única imagem
-                        val imageFile = getImageFileFromUri(data.data!!)
-                        if (imageFile != null) {
-                            selectedImages.add(imageFile)
-                        }
-                    }
-
-                    continuation.resume(selectedImages)
-                } else {
-                    continuation.resume(emptyList())
-                }
+    private fun ensureLaunchers() {
+        val activity = ApplicationContext.activity as? ComponentActivity ?: return
+        if (pickImagesLauncher == null) {
+            pickImagesLauncher = activity.registerForActivityResult(
+                ActivityResultContracts.GetMultipleContents()
+            ) { uris ->
+                pickImagesContinuation?.invoke(uris)
+                pickImagesContinuation = null
             }
         }
+        if (pickSingleImageLauncher == null) {
+            pickSingleImageLauncher = activity.registerForActivityResult(
+                ActivityResultContracts.GetContent()
+            ) { uri ->
+                pickSingleImageContinuation?.invoke(uri)
+                pickSingleImageContinuation = null
+            }
+        }
+    }
 
-        // Adiciona o listener e inicia a activity
-        activity.addActivityResultListener(resultCallback)
-        activity.startActivityForResult(intent, REQUEST_IMAGE_PICK)
+    actual suspend fun pickImages(): List<ImageFile> = suspendCancellableCoroutine { continuation ->
+        val activity = ApplicationContext.activity as? ComponentActivity
+        if (activity == null) {
+            continuation.resume(emptyList())
+            return@suspendCancellableCoroutine
+        }
+        ensureLaunchers()
+        pickImagesContinuation = { uris ->
+            MainScope().launch {
+                val limitedUris = uris.take(MAX_IMAGES_PER_POST)
+                val selectedImages = limitedUris.mapNotNull { processUriToImageFile(it) }
+                continuation.resume(selectedImages)
+            }
+        }
+        pickImagesLauncher?.launch("image/*")
     }
 
     actual suspend fun pickSingleImage(): ImageFile? = suspendCancellableCoroutine { continuation ->
-        val intent = Intent(Intent.ACTION_PICK).apply {
-            type = "image/*"
+        val activity = ApplicationContext.activity as? ComponentActivity
+        if (activity == null) {
+            continuation.resume(null)
+            return@suspendCancellableCoroutine
         }
+        ensureLaunchers()
+        pickSingleImageContinuation = { uri ->
+            MainScope().launch {
+                val imageFile = uri?.let { processUriToImageFile(it) }
+                continuation.resume(imageFile)
+            }
+        }
+        pickSingleImageLauncher?.launch("image/*")
+    }
 
-        // Cria um ActivityResultListener temporário
-        val resultCallback = object : ActivityResultCallback {
-            override fun onActivityResult(resultCode: Int, data: Intent?) {
-                activity.removeActivityResultListener(this)
+    private suspend fun processUriToImageFile(uri: Uri): ImageFile? = withContext(Dispatchers.IO) {
+        try {
+            val activity = ApplicationContext.activity ?: return@withContext null
+            val contentResolver = activity.contentResolver
+            val fileInfo = getFileInfo(contentResolver, uri)
+            val fileName = fileInfo.first ?: "img_${System.currentTimeMillis()}.jpg"
+            val mimeType = fileInfo.second ?: contentResolver.getType(uri) ?: "image/jpeg"
 
-                if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                    val imageFile = getImageFileFromUri(data.data!!)
-                    continuation.resume(imageFile)
-                } else {
-                    continuation.resume(null)
+            val cacheDir = activity.cacheDir ?: return@withContext null
+            val destinationFile = File(cacheDir, "img_${System.currentTimeMillis()}_${fileName}")
+
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(destinationFile).use { output ->
+                    input.copyTo(output)
                 }
             }
-        }
 
-        // Adiciona o listener e inicia a activity
-        activity.addActivityResultListener(resultCallback)
-        activity.startActivityForResult(intent, REQUEST_SINGLE_IMAGE_PICK)
-    }
-
-    private fun getImageFileFromUri(uri: Uri): ImageFile? {
-        // Código mantido como estava
-        val cursor = activity.contentResolver.query(
-            uri,
-            arrayOf(
-                MediaStore.Images.Media.DISPLAY_NAME,
-                MediaStore.Images.Media.MIME_TYPE,
-                MediaStore.Images.Media.SIZE
-            ),
-            null,
-            null,
-            null
-        )
-
-        cursor?.use {
-            if (it.moveToFirst()) {
-                val nameIndex = it.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME)
-                val mimeIndex = it.getColumnIndex(MediaStore.Images.Media.MIME_TYPE)
-                val sizeIndex = it.getColumnIndex(MediaStore.Images.Media.SIZE)
-
-                val name =
-                    if (nameIndex != -1) it.getString(nameIndex) else "image_${System.currentTimeMillis()}"
-                val mimeType = if (mimeIndex != -1) it.getString(mimeIndex) else "image/jpeg"
-                val size = if (sizeIndex != -1) it.getLong(sizeIndex) else 0
-
-                return ImageFile(uri.toString(), name, mimeType, size)
+            val size = destinationFile.length()
+            if (size <= MAX_IMAGE_SIZE_BYTES) {
+                ImageFile(
+                    uri = destinationFile.toURI().toString(),
+                    name = fileName,
+                    mimeType = mimeType,
+                    size = size
+                )
+            } else {
+                null
             }
+        } catch (e: Exception) {
+            Log.e("ImagePicker", "Error processing image", e)
+            null
         }
-
-        return null
     }
 
-    companion object {
-        private const val REQUEST_IMAGE_PICK = 100
-        private const val REQUEST_SINGLE_IMAGE_PICK = 101
+    private fun getFileInfo(
+        contentResolver: android.content.ContentResolver,
+        uri: Uri
+    ): Pair<String?, String?> {
+        var fileName: String? = null
+        var mimeType: String? = null
+        try {
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex != -1) {
+                        fileName = cursor.getString(nameIndex)
+                    }
+                    val mimeTypeIndex = cursor.getColumnIndex(MediaStore.Images.Media.MIME_TYPE)
+                    if (mimeTypeIndex != -1) {
+                        mimeType = cursor.getString(mimeTypeIndex)
+                    }
+                }
+            }
+            if (fileName == null && uri.path != null) {
+                fileName = uri.path?.substringAfterLast('/')
+            }
+            if (mimeType == null) {
+                mimeType = contentResolver.getType(uri)
+            }
+        } catch (e: Exception) {
+            Log.e("ImagePicker", "Error getting file info", e)
+        }
+        return Pair(fileName, mimeType)
     }
 }
-
-// Interface para o callback de resultado da Activity
-interface ActivityResultCallback {
-    fun onActivityResult(resultCode: Int, data: Intent?)
-}
-
-// Extensões para gerenciar callbacks de resultado de Activity
-private val activityResultListeners =
-    mutableMapOf<Activity, MutableMap<ActivityResultCallback, Int>>()
-
-fun Activity.addActivityResultListener(callback: ActivityResultCallback): Int {
-    if (activityResultListeners[this] == null) {
-        activityResultListeners[this] = mutableMapOf()
-    }
-    val requestCode = callback.hashCode() and 0xFFFF
-    activityResultListeners[this]!![callback] = requestCode
-    return requestCode
-}
-
-fun Activity.removeActivityResultListener(callback: ActivityResultCallback) {
-    activityResultListeners[this]?.remove(callback)
-}
-

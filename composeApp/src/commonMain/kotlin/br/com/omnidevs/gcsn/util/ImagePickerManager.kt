@@ -5,9 +5,11 @@ import kotlinx.coroutines.flow.StateFlow
 expect class ImagePickerManager() {
     val selectedImages: StateFlow<List<ImageFile>>
     val selectedImage: StateFlow<ImageFile?>
+    val errorMessage: StateFlow<String?>
 
-    fun pickImages()
-    fun pickSingleImage()
+    suspend fun pickImages()
+    suspend fun pickSingleImage()
     fun removeImage(imageFile: ImageFile)
     suspend fun getImageBytes(imageUri: String): ByteArray
+    suspend fun addImages(uris: List<Any>)
 }

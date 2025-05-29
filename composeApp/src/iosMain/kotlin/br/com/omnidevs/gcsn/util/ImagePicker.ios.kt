@@ -1,164 +1,132 @@
 package br.com.omnidevs.gcsn.util
 
-import kotlinx.cinterop.*
-import platform.UIKit.*
-import platform.Foundation.*
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.suspendCancellableCoroutine
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSNumber
+import platform.Foundation.NSURL
+import platform.Foundation.lastPathComponent
+import platform.UIKit.UIApplication
+import platform.UIKit.UIImagePickerController
+import platform.UIKit.UIImagePickerControllerDelegateProtocol
+import platform.UIKit.UIImagePickerControllerImageURL
+import platform.UIKit.UIImagePickerControllerSourceType
+import platform.UIKit.UINavigationControllerDelegateProtocol
+import platform.UniformTypeIdentifiers.UTType
+import platform.UniformTypeIdentifiers.UTTypeImage
 import platform.darwin.NSObject
 import kotlin.coroutines.resume
-import platform.Photos.*
 
 actual class ImagePicker {
+    private val MAX_IMAGES = 4
+    private val MAX_SIZE_BYTES = 1024 * 1024 // 1MB
 
-    private val viewController: UIViewController
+    @OptIn(ExperimentalForeignApi::class)
+    fun processUrlToImageFile(url: NSURL): ImageFile? {
+        val path = url.path ?: return null
+        val fileManager = NSFileManager.defaultManager
 
-    actual constructor() {
-        val keyWindow = UIApplication.sharedApplication.keyWindow
-        this.viewController = keyWindow?.rootViewController ?:
-                throw IllegalStateException("Não foi possível obter o UIViewController principal")
-    }
+        if (!fileManager.fileExistsAtPath(path)) return null
 
-    constructor(viewController: UIViewController) {
-        this.viewController = viewController
+        val attributes = fileManager.attributesOfItemAtPath(path, null)
+        val sizeInBytes = (attributes?.get("NSFileSize") as? NSNumber)?.longValue ?: 0L
+        val fileName = url.lastPathComponent ?: "unknown"
+        val mimeType = UTType.typeWithFilenameExtension(
+            fileName.substringAfterLast('.', "")
+        )?.preferredMIMEType ?: "image/jpeg"
+
+        if (sizeInBytes > MAX_SIZE_BYTES) return null
+
+        return ImageFile(
+            uri = path,
+            name = fileName,
+            mimeType = mimeType,
+            size = sizeInBytes
+        )
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    actual suspend fun pickImages(): List<ImageFile> = suspendCancellableCoroutine { continuation ->
-        val imagePickerController = UIImagePickerController()
-        imagePickerController.sourceType =
-            UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
-        imagePickerController.allowsEditing = false
-        imagePickerController.mediaTypes =
-            listOf("public.image")
+    actual suspend fun pickImages(): List<ImageFile> {
+        val rootViewController = UIApplication.sharedApplication.keyWindow?.rootViewController
+            ?: return emptyList()
 
-        imagePickerController.delegate =
-            object : NSObject(), UIImagePickerControllerDelegateProtocol,
+        val imagePicker = UIImagePickerController()
+        imagePicker.sourceType =
+            UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
+        imagePicker.mediaTypes = listOf(UTTypeImage.identifier)
+
+        return suspendCancellableCoroutine { cont ->
+            val selectedImages = mutableListOf<ImageFile>()
+
+            val delegate = object : NSObject(), UIImagePickerControllerDelegateProtocol,
                 UINavigationControllerDelegateProtocol {
                 override fun imagePickerController(
                     picker: UIImagePickerController,
                     didFinishPickingMediaWithInfo: Map<Any?, *>
                 ) {
-                    // Usando API moderna - UIImagePickerControllerImageURL
                     val imageUrl =
                         didFinishPickingMediaWithInfo[UIImagePickerControllerImageURL] as? NSURL
-                    val imagePath = imageUrl?.path
-
-                    val selectedImage = if (imagePath != null) {
-                        val fileManager = NSFileManager.defaultManager
-                        // Safe call para evitar crash
-                        val attributes = try {
-                            fileManager.attributesOfItemAtPath(imagePath, null) as? Map<Any?, *>
-                        } catch (e: Exception) {
-                            null
+                    if (imageUrl != null) {
+                        processUrlToImageFile(imageUrl)?.let { imageFile ->
+                            if (selectedImages.size < MAX_IMAGES) {
+                                selectedImages.add(imageFile)
+                            }
                         }
-
-                        val fileSize = (attributes?.get(NSFileSize) as? NSNumber)?.longValue() ?: 0L
-                        val fileName = imagePath.split("/").lastOrNull() ?: "imagem.jpg"
-
-                        ImageFile(
-                            uri = imagePath,
-                            name = fileName,
-                            mimeType = "image/jpeg",
-                            size = fileSize
-                        )
-                    } else null
-
-                    viewController.dismissViewControllerAnimated(true) {}
-                    if (selectedImage != null) {
-                        continuation.resume(listOf(selectedImage))
-                    } else {
-                        continuation.resume(emptyList())
                     }
+                    rootViewController.dismissViewControllerAnimated(true) {}
+                    cont.resume(selectedImages)
                 }
 
                 override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
-                    viewController.dismissViewControllerAnimated(true) {}
-                    continuation.resume(emptyList())
+                    rootViewController.dismissViewControllerAnimated(true) {}
+                    cont.resume(selectedImages)
                 }
             }
 
-        // Verificação de permissões
-        val status = PHPhotoLibrary.authorizationStatus()
-        when (status) {
-            PHAuthorizationStatusAuthorized -> {
-                viewController.presentViewController(imagePickerController, true, null)
-            }
-            else -> {
-                PHPhotoLibrary.requestAuthorization { newStatus ->
-                    if (newStatus == PHAuthorizationStatusAuthorized) {
-                        NSOperationQueue.mainQueue.addOperationWithBlock {
-                            viewController.presentViewController(imagePickerController, true, null)
-                        }
-                    } else {
-                        continuation.resume(emptyList())
-                    }
-                }
+            imagePicker.delegate = delegate
+            rootViewController.presentViewController(imagePicker, true, null)
+
+            cont.invokeOnCancellation {
+                rootViewController.dismissViewControllerAnimated(true) {}
             }
         }
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    actual suspend fun pickSingleImage(): ImageFile? = suspendCancellableCoroutine { continuation ->
-        val imagePickerController = UIImagePickerController()
-        imagePickerController.sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
-        imagePickerController.allowsEditing = false
-        imagePickerController.mediaTypes = listOf("public.image")
+    actual suspend fun pickSingleImage(): ImageFile? {
+        val rootViewController = UIApplication.sharedApplication.keyWindow?.rootViewController
+            ?: return null
 
-        imagePickerController.delegate = object : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
-            override fun imagePickerController(
-                picker: UIImagePickerController,
-                didFinishPickingMediaWithInfo: Map<Any?, *>
-            ) {
-                // Usando API moderna - UIImagePickerControllerImageURL
-                val imageUrl = didFinishPickingMediaWithInfo[UIImagePickerControllerImageURL] as? NSURL
-                val imagePath = imageUrl?.path
+        val imagePicker = UIImagePickerController()
+        imagePicker.sourceType =
+            UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
+        imagePicker.mediaTypes = listOf(UTTypeImage.identifier)
 
-                val selectedImage = if (imagePath != null) {
-                    val fileManager = NSFileManager.defaultManager
-                    // Safe call para evitar crash
-                    val attributes = try {
-                        fileManager.attributesOfItemAtPath(imagePath, null) as? Map<Any?, *>
-                    } catch (e: Exception) {
-                        null
-                    }
-
-                    val fileSize = (attributes?.get(NSFileSize) as? NSNumber)?.longValue() ?: 0L
-                    val fileName = imagePath.split("/").lastOrNull() ?: "imagem.jpg"
-
-                    ImageFile(
-                        uri = imagePath,
-                        name = fileName,
-                        mimeType = "image/jpeg",
-                        size = fileSize
-                    )
-                } else null
-
-                viewController.dismissViewControllerAnimated(true) {}
-                continuation.resume(selectedImage)
-            }
-
-            override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
-                viewController.dismissViewControllerAnimated(true) {}
-                continuation.resume(null)
-            }
-        }
-
-        // Verificação de permissões
-        val status = PHPhotoLibrary.authorizationStatus()
-        when (status) {
-            PHAuthorizationStatusAuthorized -> {
-                viewController.presentViewController(imagePickerController, true, null)
-            }
-            else -> {
-                PHPhotoLibrary.requestAuthorization { newStatus ->
-                    if (newStatus == PHAuthorizationStatusAuthorized) {
-                        NSOperationQueue.mainQueue.addOperationWithBlock {
-                            viewController.presentViewController(imagePickerController, true, null)
-                        }
-                    } else {
-                        continuation.resume(null)
-                    }
+        return suspendCancellableCoroutine { cont ->
+            val delegate = object : NSObject(), UIImagePickerControllerDelegateProtocol,
+                UINavigationControllerDelegateProtocol {
+                override fun imagePickerController(
+                    picker: UIImagePickerController,
+                    didFinishPickingMediaWithInfo: Map<Any?, *>
+                ) {
+                    val imageUrl =
+                        didFinishPickingMediaWithInfo[UIImagePickerControllerImageURL] as? NSURL
+                    val imageFile = imageUrl?.let { processUrlToImageFile(it) }
+                    rootViewController.dismissViewControllerAnimated(true) {}
+                    cont.resume(imageFile)
                 }
+
+                override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
+                    rootViewController.dismissViewControllerAnimated(true) {}
+                    cont.resume(null)
+                }
+            }
+
+            imagePicker.delegate = delegate
+            rootViewController.presentViewController(imagePicker, true, null)
+
+            cont.invokeOnCancellation {
+                rootViewController.dismissViewControllerAnimated(true) {}
             }
         }
     }

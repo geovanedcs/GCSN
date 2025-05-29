@@ -2,23 +2,7 @@ package br.com.omnidevs.gcsn.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -29,26 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,7 +29,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
-class CreatePostScreen :Screen {
+class CreatePostScreen : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
@@ -74,17 +40,29 @@ class CreatePostScreen :Screen {
         val imagePickerManager = getImagePickerManager()
         val selectedImages by imagePickerManager.selectedImages.collectAsState()
         val coroutineScope = rememberCoroutineScope()
-        val imageUris = remember(selectedImages) { selectedImages.map { it.uri } }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         val userData = remember { AppDependencies.authService.getUserData() }
         var userAvatar by remember { mutableStateOf<String?>(null) }
+        var loadingImages by remember { mutableStateOf(setOf<String>()) }
+        var failedImages by remember { mutableStateOf(setOf<String>()) }
+
+        LaunchedEffect(selectedImages) {
+            if (selectedImages.isEmpty()) {
+                errorMessage = null
+            } else {
+                println("Selected images count: ${selectedImages.size}")
+                selectedImages.forEach { image ->
+                    println("Image URI: ${image.uri}, Size: ${image.size}")
+                }
+            }
+        }
 
         LaunchedEffect(Unit) {
             try {
                 val profile = blueskyApi.getProfile(userData!!.did)
                 userAvatar = profile.avatar
             } catch (e: Exception) {
-                println("Erro ao buscar avatar: ${e.message}")
+                errorMessage = "Erro ao buscar avatar: ${e.message}"
             }
         }
 
@@ -107,6 +85,7 @@ class CreatePostScreen :Screen {
                                 isPosting = true
                                 coroutineScope.launch {
                                     try {
+                                        val imageUris = selectedImages.map { it.uri }
                                         blueskyApi.createPost(
                                             text = postText,
                                             images = imageUris
@@ -152,7 +131,6 @@ class CreatePostScreen :Screen {
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Campo de texto do post
                     TextField(
                         value = postText,
                         onValueChange = { postText = it },
@@ -183,13 +161,48 @@ class CreatePostScreen :Screen {
                                     .size(120.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
+                                // Track loading state with separate state variables
+                                var isLoading by remember { mutableStateOf(true) }
+                                var isError by remember { mutableStateOf(false) }
+
                                 AsyncImage(
                                     model = imageFile.uri,
                                     contentDescription = "Imagem selecionada",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
+                                    onLoading = { isLoading = true },
+                                    onSuccess = {
+                                        isLoading = false
+                                        isError = false
+                                    },
+                                    onError = {
+                                        isLoading = false
+                                        isError = true
+                                        println("Error loading image: ${imageFile.uri}")
+                                    }
                                 )
+
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.align(Alignment.Center),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+
+                                if (isError) {
+                                    Icon(
+                                        Icons.Default.Image,
+                                        contentDescription = "Erro ao carregar imagem",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(36.dp)
+                                    )
+                                }
+
+                                // File size indicator
                                 Text(
                                     text = "${imageFile.size / 1024} KB",
                                     color = Color.White,
@@ -198,10 +211,10 @@ class CreatePostScreen :Screen {
                                         .background(Color.Black.copy(alpha = 0.5f))
                                         .padding(4.dp)
                                 )
+
+                                // Remove button
                                 IconButton(
-                                    onClick = {
-                                        imagePickerManager.removeImage(imageFile)
-                                    },
+                                    onClick = { imagePickerManager.removeImage(imageFile) },
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
                                         .size(32.dp)
@@ -219,26 +232,33 @@ class CreatePostScreen :Screen {
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+
                 errorMessage?.let {
                     Text(it, color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Start
                 ) {
                     FilledTonalIconButton(
                         onClick = {
-                            imagePickerManager.pickImages()
+                            errorMessage = null
+                            coroutineScope.launch {
+                                try {
+                                    imagePickerManager.pickSingleImage()
+                                } catch (e: Exception) {
+                                    errorMessage = "Erro ao selecionar imagens: ${e.message}"
+                                }
+                            }
                         }
                     ) {
-                        Icon(
-                            Icons.Default.Image,
-                            contentDescription = "Adicionar imagem"
-                        )
+                        Icon(Icons.Default.Image, contentDescription = "Adicionar imagem")
                     }
                 }
             }
+
             if (isPosting) {
                 Box(
                     modifier = Modifier

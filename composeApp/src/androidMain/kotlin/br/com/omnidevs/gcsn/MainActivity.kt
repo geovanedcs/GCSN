@@ -1,5 +1,6 @@
 package br.com.omnidevs.gcsn
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,10 +24,10 @@ import cafe.adriel.voyager.transitions.SlideTransition
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        ApplicationContext.initialize(this)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        ApplicationContext.initialize(this)
 
         val secureStorageProvider = SecureStorageProvider(applicationContext)
         AppDependencies.initialize(secureStorageProvider)
