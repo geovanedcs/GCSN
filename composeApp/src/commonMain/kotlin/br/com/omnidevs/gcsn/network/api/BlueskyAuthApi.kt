@@ -1,6 +1,7 @@
 package br.com.omnidevs.gcsn.network.api
 
 import br.com.omnidevs.gcsn.network.HttpClientProvider
+import br.com.omnidevs.gcsn.util.AppDependencies
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -14,7 +15,7 @@ import kotlinx.serialization.Serializable
 
 class BlueskyAuthApi {
 
-    private val client = HttpClientProvider.client
+    private val client = HttpClientProvider.getClient(AppDependencies.authService)
 
     suspend fun login(email: String, password: String): AuthResponse? {
         return try {

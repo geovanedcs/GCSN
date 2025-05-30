@@ -1,17 +1,11 @@
 package br.com.omnidevs.gcsn.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -22,13 +16,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -48,14 +41,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
-import br.com.omnidevs.gcsn.model.actor.Actor
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.ui.components.CommonBottomBar
 import br.com.omnidevs.gcsn.ui.components.CommonFAB
 import br.com.omnidevs.gcsn.ui.components.InfiniteScrollHandler
 import br.com.omnidevs.gcsn.ui.components.LoadingIndicator
 import br.com.omnidevs.gcsn.ui.components.PostItem
-import br.com.omnidevs.gcsn.ui.components.ProfileHeader
 import br.com.omnidevs.gcsn.ui.navigation.TabItem
 import br.com.omnidevs.gcsn.util.AppDependencies
 import br.com.omnidevs.gcsn.util.AuthService
@@ -66,57 +57,42 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import kotlinx.coroutines.launch
 
-class ProfileScreen(
-    private val handle: String
-) : Screen {
-
+class DiscoverScreen : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val coroutineScope = rememberCoroutineScope()
-        val navigator = LocalNavigator.current
-        val authService = AppDependencies.authService
         val snackbarHostState = remember { SnackbarHostState() }
-
-        var actor by remember { mutableStateOf<Actor?>(null) }
+        val navigator = LocalNavigator.current
         var feed by remember { mutableStateOf<Feed?>(null) }
         var isLoading by remember { mutableStateOf(true) }
-        var errorMessage by remember { mutableStateOf<String?>(null) }
-        var currentTab by remember { mutableStateOf<TabItem>(TabItem.ProfileTab) }
-        var isOwnProfile by remember { mutableStateOf(false) }
-
-        // Estado para controlar a visibilidade do header
-        val lazyListState = rememberLazyListState()
-        val isHeaderVisible by remember {
-            derivedStateOf {
-                lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset < 200
-            }
-        }
-
+        var error by remember { mutableStateOf<String?>(null) }
+        var currentTab by remember { mutableStateOf<TabItem>(TabItem.DiscoverTab) }
         val blueskyApi = remember { BlueskyApi() }
+        val authService = AppDependencies.authService
+        val listState = rememberLazyListState()
 
-        // Add scroll behavior para TopAppBar e estados para animação
         val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
         val bottomBarState = remember { derivedStateOf { scrollBehavior.state.heightOffset == 0f } }
 
-        LaunchedEffect(handle) {
-            // Validar autenticação antes de carregar o perfil
+        LaunchedEffect(Unit) {
             if (!validateAuthentication(authService, navigator)) {
                 return@LaunchedEffect
             }
 
-            // Verificar se é o próprio perfil do usuário
-            val userData = authService.getUserData()
-            isOwnProfile = userData?.handle == handle
-
-            loadProfileData(
-                blueskyApi = blueskyApi,
-                handle = handle,
-                onActorLoaded = { loadedActor -> actor = loadedActor },
-                onFeedLoaded = { userFeed -> feed = userFeed },
-                onError = { error -> errorMessage = error },
-                onComplete = { isLoading = false }
-            )
+            try {
+                // Usar uma feed de descoberta diferente da timeline padrão
+                val discoverFeed = blueskyApi.getFeed(
+                    feed = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
+                    limit = 20
+                )
+                feed = discoverFeed
+                error = null
+            } catch (e: Exception) {
+                error = e.message ?: "Erro desconhecido"
+            } finally {
+                isLoading = false
+            }
         }
 
         Scaffold(
@@ -125,42 +101,37 @@ class ProfileScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
-                    modifier = Modifier.windowInsetsPadding(
-                        WindowInsets.statusBars.only(WindowInsetsSides.Top)
-                    ),
-                    title = { Text(actor?.displayName ?: handle) },
-                    navigationIcon = {
-                        IconButton(onClick = { navigator?.pop() }) {
-                            Icon(
-                                Icons.Filled.ArrowBack,
-                                contentDescription = "Voltar"
-                            )
-                        }
-                    },
+                    title = { Text("Descobrir") },
                     actions = {
                         IconButton(onClick = {
                             coroutineScope.launch {
-                                // Validar autenticação antes de recarregar os dados
                                 if (!validateAuthentication(authService, navigator)) {
                                     return@launch
                                 }
 
                                 isLoading = true
-                                errorMessage = null
-                                loadProfileData(
-                                    blueskyApi = blueskyApi,
-                                    handle = handle,
-                                    onActorLoaded = { loadedActor -> actor = loadedActor },
-                                    onFeedLoaded = { userFeed -> feed = userFeed },
-                                    onError = { error -> errorMessage = error },
-                                    onComplete = { isLoading = false }
-                                )
+                                error = null
+                                try {
+                                    val discoverFeed = blueskyApi.getFeed(
+                                        feed = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
+                                        limit = 20
+                                    )
+                                    feed = discoverFeed
+                                } catch (e: Exception) {
+                                    error = e.message ?: "Erro desconhecido"
+                                } finally {
+                                    isLoading = false
+                                }
                             }
                         }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Atualizar")
                         }
                     },
-                    scrollBehavior = scrollBehavior
+                    colors = TopAppBarDefaults.topAppBarColors(),
+                    scrollBehavior = scrollBehavior,
+                    modifier = Modifier.windowInsetsPadding(
+                        WindowInsets.statusBars.only(WindowInsetsSides.Top)
+                    )
                 )
             },
             bottomBar = {
@@ -173,74 +144,72 @@ class ProfileScreen(
                 )
             },
             floatingActionButton = {
-                // Mostrar FAB apenas se for o perfil do próprio usuário
-                if (isOwnProfile) {
-                    CommonFAB(
-                        isVisible = bottomBarState,
-                        icon = Icons.Default.Add,
-                        contentDescription = "Nova postagem"
-                    ) {
-                        if (validateAuthentication(authService, navigator)) {
-                            navigator?.push(CreatePostScreen())
-                        }
+                CommonFAB(
+                    isVisible = bottomBarState,
+                    icon = Icons.Default.Add,
+                    contentDescription = "Nova postagem"
+                ) {
+                    if (validateAuthentication(authService, navigator)) {
+                        navigator?.push(CreatePostScreen())
                     }
                 }
             }
-        ) { paddingValues ->
+        ) { innerPadding ->
             Box(
                 modifier = Modifier
-                    .padding(paddingValues)
+                    .padding(innerPadding)
                     .fillMaxSize()
             ) {
                 when {
-                    isLoading && actor == null -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
+                    isLoading && feed == null -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
 
-                    errorMessage != null -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                    error != null -> {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = errorMessage ?: "Erro desconhecido",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
+                            Text("Erro ao carregar feed: $error")
+                            Spacer(Modifier.height(8.dp))
+                            Button(onClick = {
+                                coroutineScope.launch {
+                                    if (!validateAuthentication(authService, navigator)) {
+                                        return@launch
+                                    }
 
-                    actor != null -> {
-                        LazyColumn(
-                            state = lazyListState,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            item {
-                                AnimatedVisibility(
-                                    visible = isHeaderVisible,
-                                    enter = fadeIn() + expandVertically(),
-                                    exit = fadeOut() + shrinkVertically()
-                                ) {
-                                    Column {
-                                        ProfileHeader(actor = actor!!)
-                                        Spacer(modifier = Modifier.height(16.dp))
+                                    isLoading = true
+                                    error = null
+                                    try {
+                                        val discoverFeed = blueskyApi.getFeed(
+                                            feed = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
+                                            limit = 20
+                                        )
+                                        feed = discoverFeed
+                                    } catch (e: Exception) {
+                                        error = e.message ?: "Erro desconhecido"
+                                    } finally {
+                                        isLoading = false
                                     }
                                 }
+                            }) {
+                                Text("Tentar novamente")
                             }
+                        }
+                    }
 
-                            feed?.let { userFeed ->
-                                items(userFeed.feed) { feedViewPost ->
-                                    PostItem(
-                                        post = feedViewPost.post,
-                                        onAuthorClick = { authorDid ->
-                                            navigator?.push(ProfileScreen(authorDid))
-                                        }
-                                    )
-                                }
+                    feed != null -> {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(feed!!.feed) { feedViewPost ->
+                                PostItem(
+                                    post = feedViewPost.post,
+                                    onAuthorClick = { authorDid ->
+                                        navigator?.push(ProfileScreen(authorDid))
+                                    }
+                                )
                             }
 
                             // Indicador de carregamento no final da lista
@@ -253,10 +222,10 @@ class ProfileScreen(
 
                         // Handler para carregamento infinito
                         InfiniteScrollHandler(
-                            listState = lazyListState,
+                            listState = listState,
                             loading = isLoading,
                             onLoadMore = {
-                                if (feed?.cursor != null && actor != null) {
+                                if (feed?.cursor != null) {
                                     coroutineScope.launch {
                                         if (!validateAuthentication(authService, navigator)) {
                                             return@launch
@@ -264,8 +233,9 @@ class ProfileScreen(
 
                                         isLoading = true
                                         try {
-                                            val nextPage = blueskyApi.getAuthorFeed(
-                                                actor = actor!!.did,
+                                            val nextPage = blueskyApi.getFeed(
+                                                feed = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
+                                                limit = 20,
                                                 cursor = feed?.cursor
                                             )
                                             feed = Feed(
@@ -301,30 +271,5 @@ class ProfileScreen(
             return false
         }
         return true
-    }
-}
-
-private suspend fun loadProfileData(
-    blueskyApi: BlueskyApi,
-    handle: String,
-    onActorLoaded: (Actor) -> Unit,
-    onFeedLoaded: (Feed) -> Unit,
-    onError: (String) -> Unit,
-    onComplete: () -> Unit
-) {
-    try {
-        val actor = blueskyApi.getProfile(handle)
-        onActorLoaded(actor)
-
-        try {
-            val userFeed = blueskyApi.getAuthorFeed(actor.did)
-            onFeedLoaded(userFeed)
-        } catch (e: Exception) {
-            onError("Erro ao carregar feed: ${e.message}")
-        }
-    } catch (e: Exception) {
-        onError("Erro ao carregar perfil: ${e.message}")
-    } finally {
-        onComplete()
     }
 }

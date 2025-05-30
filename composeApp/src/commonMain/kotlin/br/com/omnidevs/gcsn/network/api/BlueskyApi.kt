@@ -30,7 +30,7 @@ import kotlinx.serialization.json.Json
 
 class BlueskyApi {
 
-    private val client = HttpClientProvider.client
+    private val client = HttpClientProvider.getClient(AppDependencies.authService)
 
     suspend fun getProfile(actor: String): Actor {
         return client.get("https://bsky.social/xrpc/app.bsky.actor.getProfile") {
@@ -140,40 +140,18 @@ class BlueskyApi {
         val jsonString = Json.encodeToString(CreatePostRequest.serializer(), createPostRequest)
         println("Request payload: $jsonString")
 
-        val response = client.post("https://bsky.social/xrpc/com.atproto.repo.createRecord") {
+        return client.post("https://bsky.social/xrpc/com.atproto.repo.createRecord") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(createPostRequest)
-        }
-
-        try {
-            // Log raw response for debugging
-            val responseText = response.bodyAsText()
-            println("API Response: $responseText")
-
-            // Use kotlinx.serialization to parse the response
-            return Json {
-                encodeDefaults = true
-                ignoreUnknownKeys = true
-                isLenient = true
-                allowSpecialFloatingPointValues = true
-                useArrayPolymorphism = false
-            }.decodeFromString(responseText)
-        } catch (e: Exception) {
-            println("Error parsing response: ${e.message}")
-            e.printStackTrace()
-            throw IllegalStateException("Failed to parse API response", e)
-        }
-
+        }.body()
     }
-
-
 
     private suspend fun getImageBytesFromUri(imageUri: String): ByteArray {
         return getCachedBytes(imageUri) ?: AppDependencies.mediaContentReader.getMediaBytes(imageUri)
     }
 
     suspend fun getTimeline(limit: Int = 20, cursor: String? = null): Feed {
-        return client.get("xrpc/app.bsky.feed.getTimeline") {
+        return client.get("https://bsky.social/xrpc/app.bsky.feed.getTimeline") {
             url.parameters.append("limit", limit.toString())
             cursor?.let { url.parameters.append("cursor", it) }
         }.body()

@@ -1,15 +1,11 @@
 package br.com.omnidevs.gcsn.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -17,18 +13,15 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -49,11 +42,19 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
+import br.com.omnidevs.gcsn.ui.components.CommonBottomBar
+import br.com.omnidevs.gcsn.ui.components.CommonFAB
+import br.com.omnidevs.gcsn.ui.components.InfiniteScrollHandler
+import br.com.omnidevs.gcsn.ui.components.LoadingIndicator
 import br.com.omnidevs.gcsn.ui.components.PostItem
 import br.com.omnidevs.gcsn.ui.navigation.TabItem
 import br.com.omnidevs.gcsn.util.AppDependencies
+import br.com.omnidevs.gcsn.util.AuthService
+import br.com.omnidevs.gcsn.util.AuthState
+import br.com.omnidevs.gcsn.util.AuthStateManager
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.Navigator
 import kotlinx.coroutines.launch
 
 class HomeScreen : Screen {
@@ -68,17 +69,18 @@ class HomeScreen : Screen {
         var error by remember { mutableStateOf<String?>(null) }
         var currentTab by remember { mutableStateOf<TabItem>(TabItem.HomeTab) }
         val blueskyApi = remember { BlueskyApi() }
+        val authService = AppDependencies.authService
+        val listState = rememberLazyListState()
 
         val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
         val bottomBarState = remember { derivedStateOf { scrollBehavior.state.heightOffset == 0f } }
 
-        val tabs = listOf(
-            TabItem.HomeTab,
-            TabItem.SearchTab,
-            TabItem.ProfileTab
-        )
-
         LaunchedEffect(Unit) {
+            // Validar autenticação antes de carregar o feed
+            if (!validateAuthentication(authService, navigator)) {
+                return@LaunchedEffect
+            }
+
             loadFeed(blueskyApi, onSuccess = { feed = it }, onError = { error = it })
             isLoading = false
         }
@@ -93,6 +95,11 @@ class HomeScreen : Screen {
                     actions = {
                         IconButton(onClick = {
                             coroutineScope.launch {
+                                // Validar autenticação antes de recarregar o feed
+                                if (!validateAuthentication(authService, navigator)) {
+                                    return@launch
+                                }
+
                                 isLoading = true
                                 error = null
                                 loadFeed(
@@ -103,7 +110,7 @@ class HomeScreen : Screen {
                                 isLoading = false
                             }
                         }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                            Icon(Icons.Default.Refresh, contentDescription = "Atualizar")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(),
@@ -114,51 +121,23 @@ class HomeScreen : Screen {
                 )
             },
             bottomBar = {
-                AnimatedVisibility(
-                    visible = bottomBarState.value,
-                    enter = slideInVertically(initialOffsetY = { it }),
-                    exit = slideOutVertically(targetOffsetY = { it })
-                ) {
-                    NavigationBar {
-                        tabs.forEach { tab ->
-                            NavigationBarItem(
-                                icon = {
-                                    tab.options.icon?.let { icon ->
-                                        Icon(painter = icon, contentDescription = tab.options.title)
-                                    }
-                                },
-                                label = { Text(tab.options.title) },
-                                selected = currentTab == tab,
-                                onClick = {
-                                    currentTab = tab
-                                    when (tab) {
-                                        TabItem.HomeTab -> {
-                                        }
-
-                                        TabItem.SearchTab -> {
-                                            navigator?.push(SearchScreen())
-                                        }
-
-                                        TabItem.ProfileTab -> {
-                                            val userData = AppDependencies.authService.getUserData()
-                                            navigator?.push(ProfileScreen(userData!!.handle))
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
+                CommonBottomBar(
+                    isVisible = bottomBarState,
+                    currentTab = currentTab,
+                    onTabSelected = { currentTab = it },
+                    navigator = navigator,
+                    authService = authService
+                )
             },
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { navigator?.push(CreatePostScreen()) },
-                    containerColor = MaterialTheme.colorScheme.primary
+                CommonFAB(
+                    isVisible = bottomBarState,
+                    icon = Icons.Default.Add,
+                    contentDescription = "Nova postagem"
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Nova postagem"
-                    )
+                    if (validateAuthentication(authService, navigator)) {
+                        navigator?.push(CreatePostScreen())
+                    }
                 }
             }
         ) { innerPadding ->
@@ -177,10 +156,14 @@ class HomeScreen : Screen {
                             modifier = Modifier.align(Alignment.Center),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("Error loading feed: $error")
+                            Text("Erro ao carregar feed: $error")
                             Spacer(Modifier.height(8.dp))
                             Button(onClick = {
                                 coroutineScope.launch {
+                                    if (!validateAuthentication(authService, navigator)) {
+                                        return@launch
+                                    }
+
                                     isLoading = true
                                     error = null
                                     loadFeed(
@@ -191,13 +174,14 @@ class HomeScreen : Screen {
                                     isLoading = false
                                 }
                             }) {
-                                Text("Retry")
+                                Text("Tentar novamente")
                             }
                         }
                     }
 
                     feed != null -> {
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(feed!!.feed) { feedViewPost ->
@@ -205,45 +189,66 @@ class HomeScreen : Screen {
                                     post = feedViewPost.post,
                                     onAuthorClick = { authorDid ->
                                         navigator?.push(ProfileScreen(authorDid))
-                                    })
+                                    }
+                                )
                             }
 
+                            // Indicador de carregamento no final da lista
                             item {
-                                if (feed?.cursor != null) {
-                                    LoadMoreButton(
-                                        isLoading = isLoading,
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                isLoading = true
-                                                try {
-                                                    val nextPage =
-                                                        blueskyApi.getFeed(
-                                                            feed = "at://did:plc:jzecvjo2bsjptyxnfoixfnfv/app.bsky.feed.generator/aaalrki4j7sjw",
-                                                            limit = 20,
-                                                            cursor = feed?.cursor
-                                                        )
-                                                    feed = Feed(
-                                                        feed = feed!!.feed + nextPage.feed,
-                                                        cursor = nextPage.cursor
-                                                    )
-                                                } catch (e: Exception) {
-                                                    snackbarHostState.showSnackbar(
-                                                        "Failed to load more posts: ${e.message}"
-                                                    )
-                                                    println(e.message)
-                                                } finally {
-                                                    isLoading = false
-                                                }
-                                            }
-                                        }
-                                    )
+                                if (feed?.cursor != null && isLoading) {
+                                    LoadingIndicator()
                                 }
                             }
                         }
+
+                        // Handler para carregamento infinito
+                        InfiniteScrollHandler(
+                            listState = listState,
+                            loading = isLoading,
+                            onLoadMore = {
+                                if (feed?.cursor != null) {
+                                    coroutineScope.launch {
+                                        if (!validateAuthentication(authService, navigator)) {
+                                            return@launch
+                                        }
+
+                                        isLoading = true
+                                        try {
+                                            val nextPage =
+                                                blueskyApi.getTimeline(cursor = feed?.cursor)
+                                            feed = Feed(
+                                                feed = feed!!.feed + nextPage.feed,
+                                                cursor = nextPage.cursor
+                                            )
+                                        } catch (e: Exception) {
+                                            snackbarHostState.showSnackbar(
+                                                "Falha ao carregar mais posts: ${e.message}"
+                                            )
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    }
+                                }
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+
+    // Função para validar autenticação
+    private suspend fun validateAuthentication(
+        authService: AuthService,
+        navigator: Navigator?
+    ): Boolean {
+        val isValid = authService.validateToken()
+        if (!isValid) {
+            AuthStateManager.setAuthState(AuthState.LOGGED_OUT)
+            navigator?.replaceAll(FirstStartScreen())
+            return false
+        }
+        return true
     }
 
     private suspend fun loadFeed(
@@ -252,32 +257,15 @@ class HomeScreen : Screen {
         onError: (String) -> Unit
     ) {
         try {
-            val feed =
-                api.getFeed(
-                    feed = "at://did:plc:jzecvjo2bsjptyxnfoixfnfv/app.bsky.feed.generator/aaalrki4j7sjw",
-                    limit = 20
-                )
+            val feed = api.getTimeline()
             onSuccess(feed)
         } catch (e: Exception) {
-            onError(e.message ?: "Unknown error occurred")
-        }
-    }
-}
-
-@Composable
-private fun LoadMoreButton(isLoading: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        if (isLoading) {
-            CircularProgressIndicator()
-        } else {
-            Button(onClick = onClick) {
-                Text("Load more")
+            // Verifica se o erro é relacionado à autenticação
+            if (e.message?.contains("unauthorized", ignoreCase = true) == true) {
+                AuthStateManager.setAuthState(AuthState.LOGGED_OUT)
+                // O redirecionamento será tratado na próxima chamada a validateAuthentication
             }
+            onError(e.message ?: "Erro desconhecido")
         }
     }
 }

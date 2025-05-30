@@ -3,9 +3,11 @@ package br.com.omnidevs.gcsn.ui.navigation
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
@@ -17,8 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
+import br.com.omnidevs.gcsn.ui.screens.DiscoverScreen
 import br.com.omnidevs.gcsn.ui.screens.HomeScreen
 import br.com.omnidevs.gcsn.ui.screens.ProfileScreen
+import br.com.omnidevs.gcsn.ui.screens.SearchScreen
 import br.com.omnidevs.gcsn.util.AppDependencies
 import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabOptions
@@ -52,15 +56,23 @@ sealed class TabItem(
         }
     }
 
-    object SearchTab : TabItem("Buscar", Icons.Filled.Search, Icons.Outlined.Search, 1u) {
+    object DiscoverTab : TabItem("Descobrir", Icons.Filled.Explore, Icons.Outlined.Explore, 1u) {
         @Composable
         override fun Content() {
             currentTab = this
-            PlaceholderScreen("Tela de Busca em Desenvolvimento")
+            DiscoverScreen()
         }
     }
 
-    object ProfileTab : TabItem("Perfil", Icons.Filled.Person, Icons.Outlined.Person, 2u) {
+    object SearchTab : TabItem("Buscar", Icons.Filled.Search, Icons.Outlined.Search, 2u) {
+        @Composable
+        override fun Content() {
+            currentTab = this
+            SearchScreen()
+        }
+    }
+
+    object ProfileTab : TabItem("Perfil", Icons.Filled.Person, Icons.Outlined.Person, 3u) {
         @Composable
         override fun Content() {
             currentTab = this
