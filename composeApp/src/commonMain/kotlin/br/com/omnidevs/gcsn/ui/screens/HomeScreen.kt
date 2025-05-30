@@ -201,7 +201,11 @@ class HomeScreen : Screen {
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(feed!!.feed) { feedViewPost ->
-                                PostItem(post = feedViewPost.post)
+                                PostItem(
+                                    post = feedViewPost.post,
+                                    onAuthorClick = { authorDid ->
+                                        navigator?.push(ProfileScreen(authorDid))
+                                    })
                             }
 
                             item {

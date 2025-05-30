@@ -21,11 +21,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import br.com.omnidevs.gcsn.model.actor.Actor
+import br.com.omnidevs.gcsn.util.AppDependencies
+import br.com.omnidevs.gcsn.util.AuthService
 import coil3.compose.AsyncImage
 import gcsn.composeapp.generated.resources.Res
 import gcsn.composeapp.generated.resources.avatarMasc
@@ -35,17 +38,21 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun ProfileHeader(actor: Actor) {
     val showPopup = remember { mutableStateOf(false) }
+    val isOwnProfile = remember {
+        val userData = AppDependencies.authService.getUserData()
+        userData?.handle == actor.handle
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(250.dp)
     ) {
-        // Banner image section - unchanged
         if (actor.banner?.isNotEmpty() == true) {
             AsyncImage(
                 model = actor.banner.toString(),
                 contentDescription = "Banner",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
@@ -54,13 +61,13 @@ fun ProfileHeader(actor: Actor) {
             Image(
                 painter = painterResource(Res.drawable.banner),
                 contentDescription = "Banner",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(150.dp)
             )
         }
 
-        // Profile info section
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -125,24 +132,24 @@ fun ProfileHeader(actor: Actor) {
             }
         }
 
-        // Edit profile text
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-        ) {
-            Text(
-                text = "Editar perfil",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.primary,
+        if (isOwnProfile == true) {
+            Box(
                 modifier = Modifier
-                    .clip(MaterialTheme.shapes.small)
-                    .clickable { showPopup.value = true }
-                    .padding(8.dp)
-            )
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Editar perfil",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable { showPopup.value = true }
+                        .padding(8.dp)
+                )
+            }
         }
 
-        // Popup dialog
         if (showPopup.value) {
             Popup(
                 alignment = Alignment.Center,

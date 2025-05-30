@@ -1,11 +1,17 @@
 package br.com.omnidevs.gcsn.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -13,6 +19,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -29,6 +36,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +72,14 @@ class ProfileScreen(
         var isLoadingFeed by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var currentTab by remember { mutableStateOf<TabItem>(TabItem.ProfileTab) }
+
+        // Estado para controlar a visibilidade do header
+        val lazyListState = rememberLazyListState()
+        val isHeaderVisible by remember {
+            derivedStateOf {
+                lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset < 200
+            }
+        }
 
         val blueskyApi = remember { BlueskyApi() }
 
@@ -213,23 +229,38 @@ class ProfileScreen(
                     }
 
                     actor != null -> {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            ProfileHeader(actor = actor!!)
-                            Spacer(modifier = Modifier.height(16.dp))
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            item {
+                                AnimatedVisibility(
+                                    visible = isHeaderVisible,
+                                    enter = fadeIn() + expandVertically(),
+                                    exit = fadeOut() + shrinkVertically()
+                                ) {
+                                    Column {
+                                        ProfileHeader(actor = actor!!)
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                    }
+                                }
+                            }
 
                             if (isLoadingFeed) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator()
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(100.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator()
+                                    }
                                 }
                             } else {
-                                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    feed?.let { userFeed ->
-                                        items(userFeed.feed) { feedViewPost ->
-                                            PostItem(post = feedViewPost.post)
-                                        }
+                                feed?.let { userFeed ->
+                                    items(userFeed.feed) { feedViewPost ->
+                                        PostItem(post = feedViewPost.post)
                                     }
                                 }
                             }
