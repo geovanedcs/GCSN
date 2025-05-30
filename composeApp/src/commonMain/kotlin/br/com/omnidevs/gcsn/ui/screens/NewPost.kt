@@ -21,43 +21,102 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import br.com.omnidevs.gcsn.model.ImageFile
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.util.AppDependencies
-import br.com.omnidevs.gcsn.model.ImageFile
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
-// import dev.icerock.moko.media.compose.rememberMediaPickerControllerFactory // Removido
-import dev.icerock.moko.media.picker.MediaPickerController
-// import dev.icerock.moko.media.MediaType // Removido se não usado
-import dev.icerock.moko.media.FileMedia
-// import dev.icerock.moko.permissions.compose.rememberPermissionsControllerFactory // Removido
-import dev.icerock.moko.permissions.DeniedException
-import dev.icerock.moko.permissions.DeniedAlwaysException
-import dev.icerock.moko.permissions.Permission
-import dev.icerock.moko.permissions.PermissionsController
+import com.mohamedrejeb.calf.io.name
+import com.mohamedrejeb.calf.io.path
+import com.mohamedrejeb.calf.io.readByteArray
+import com.mohamedrejeb.calf.picker.FilePickerFileType
+import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
+import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
+import com.mohamedrejeb.calf.permissions.Permission
+import com.mohamedrejeb.calf.permissions.PermissionStatus
+import com.mohamedrejeb.calf.permissions.rememberPermissionState
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class, com.mohamedrejeb.calf.permissions.ExperimentalPermissionsApi::class)
 class CreatePostScreen : Screen {
-    @OptIn(ExperimentalMaterial3Api::class)
+    private val MAX_IMAGES = 4
+
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.current
         val blueskyApi = remember { BlueskyApi() }
-        var postText by remember { mutableStateOf("") }
-        var isPosting by remember { mutableStateOf(false) }
         val coroutineScope = rememberCoroutineScope()
+        var postText by remember { mutableStateOf("") }
+        var selectedImages by remember { mutableStateOf<List<ImageFile>>(emptyList()) }
+        var isPosting by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         val userData = remember { AppDependencies.authService.getUserData() }
         var userAvatar by remember { mutableStateOf<String?>(null) }
 
-        // Obtenha os controladores de AppDependencies
-        val mediaPickerController = remember { AppDependencies.mediaPickerController }
-        val permissionsController = remember { AppDependencies.permissionsController }
+        // Setup permission state
+        val galleryPermissionState = rememberPermissionState(Permission.ReadStorage)
 
-        var selectedImages by remember { mutableStateOf<List<ImageFile>>(emptyList()) }
+        // Setup file picker launcher
+        val filePickerLauncher = rememberFilePickerLauncher(
+            type = FilePickerFileType.Image,
+            selectionMode = FilePickerSelectionMode.Single,
+            onResult = { files ->
+                coroutineScope.launch {
+                    try {
+                        if (files.isNotEmpty()) {
+                            val file = files.first()
+                            val fileName = file.name
+                            val filePath = file.path?.toString() ?: ""
 
-        val MAX_IMAGES = 4
+                            // Read bytes directly with Calf and cache them
+                            val fileBytes = try {
+                                file.readByteArray().also { bytes ->
+                                    // Cache the bytes for later use during upload
+                                    BlueskyApi.cacheImageBytes(filePath, bytes)
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = "Erro ao ler o arquivo: ${e.message}"
+                                null
+                            }
+
+                            val fileSize = fileBytes?.size?.toLong() ?: 1024L
+
+                            val extension = fileName?.substringAfterLast('.', "")?.lowercase() ?: ""
+                            val inferredMimeType = when (extension) {
+                                "jpg", "jpeg" -> "image/jpeg"
+                                "png" -> "image/png"
+                                "gif" -> "image/gif"
+                                "webp" -> "image/webp"
+                                else -> null
+                            }
+
+                            if (inferredMimeType?.startsWith("image/") == true) {
+                                val imageFile = ImageFile(
+                                    uri = filePath,
+                                    name = fileName?.toString() ?: "unknown",
+                                    mimeType = inferredMimeType,
+                                    size = fileSize
+                                )
+
+                                if (selectedImages.size < MAX_IMAGES) {
+                                    selectedImages = selectedImages + imageFile
+                                } else {
+                                    errorMessage = "Máximo de $MAX_IMAGES imagens permitidas."
+                                }
+                            } else {
+                                errorMessage = "Por favor, selecione um arquivo de imagem válido."
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Only show error for non-cancellation exceptions
+                        if (e.message?.contains("cancel", ignoreCase = true) != true) {
+                            errorMessage = "Erro ao selecionar imagem: ${e.message ?: "Desconhecido"}"
+                        }
+                    }
+                }
+            }
+        )
 
         LaunchedEffect(Unit) {
             try {
@@ -84,13 +143,17 @@ class CreatePostScreen : Screen {
                     actions = {
                         Button(
                             onClick = {
+                                if (postText.isEmpty() && selectedImages.isEmpty()) {
+                                    errorMessage = "Por favor, adicione texto ou imagens à sua postagem."
+                                    return@Button
+                                }
+
                                 isPosting = true
                                 coroutineScope.launch {
                                     try {
-                                        val imageUris = selectedImages.map { it.uri }
                                         blueskyApi.createPost(
                                             text = postText,
-                                            images = imageUris
+                                            images = selectedImages
                                         )
                                         navigator?.pop()
                                     } catch (e: Exception) {
@@ -99,7 +162,7 @@ class CreatePostScreen : Screen {
                                     }
                                 }
                             },
-                            enabled = postText.isNotEmpty() && !isPosting
+                            enabled = !isPosting && (postText.isNotEmpty() || selectedImages.isNotEmpty())
                         ) {
                             Text("Publicar")
                         }
@@ -213,8 +276,7 @@ class CreatePostScreen : Screen {
 
                                 IconButton(
                                     onClick = {
-                                        selectedImages =
-                                            selectedImages.filterNot { it == imageFile }
+                                        selectedImages = selectedImages.filterNot { it == imageFile }
                                     },
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
@@ -249,18 +311,24 @@ class CreatePostScreen : Screen {
                                 errorMessage = "Máximo de $MAX_IMAGES imagens permitidas."
                             } else {
                                 errorMessage = null
-                                coroutineScope.launch {
-                                    pickImageAndUpdateList(
-                                        mediaPickerController = mediaPickerController, // Usando a instância de AppDependencies
-                                        permissionsController = permissionsController, // Usando a instância de AppDependencies
-                                        currentImages = selectedImages,
-                                        onImagesUpdated = { newImages ->
-                                            selectedImages = newImages
-                                        },
-                                        onError = { errorMsg ->
-                                            errorMessage = errorMsg
+
+                                // Check permission before launching picker
+                                when {
+                                    galleryPermissionState.status == PermissionStatus.Granted -> {
+                                        filePickerLauncher.launch()
+                                    }
+
+                                    else -> {
+                                        coroutineScope.launch {
+                                            galleryPermissionState.launchPermissionRequest()
+                                            if (galleryPermissionState.status == PermissionStatus.Granted) {
+                                                filePickerLauncher.launch()
+                                            } else {
+                                                errorMessage =
+                                                    "Permissão para acessar a galeria não foi concedida."
+                                            }
                                         }
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -279,90 +347,6 @@ class CreatePostScreen : Screen {
                 ) {
                     CircularProgressIndicator()
                 }
-            }
-        }
-    }
-
-    private suspend fun pickImageAndUpdateList(
-        mediaPickerController: MediaPickerController,
-        permissionsController: PermissionsController,
-        currentImages: List<ImageFile>,
-        onImagesUpdated: (List<ImageFile>) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        println("MokoTest: pickImageAndUpdateList called")
-        try {
-            println("MokoTest: --- About to call isPermissionGranted(Permission.GALLERY) ---")
-            val isGranted = permissionsController.isPermissionGranted(Permission.GALLERY)
-            println("MokoTest: --- isPermissionGranted(Permission.GALLERY) returned: $isGranted ---")
-
-            if (!isGranted) {
-                println("MokoTest: Permission.GALLERY not granted. --- About to call providePermission(Permission.GALLERY) ---")
-                permissionsController.providePermission(Permission.GALLERY)
-                println("MokoTest: --- providePermission(Permission.GALLERY) finished. --- Checking permission again.")
-                val isGrantedAfterRequest =
-                    permissionsController.isPermissionGranted(Permission.GALLERY)
-                println("MokoTest: --- isPermissionGranted(Permission.GALLERY) after request returned: $isGrantedAfterRequest ---")
-                if (!isGrantedAfterRequest) {
-                    println("MokoTest: Permission.GALLERY still not granted after request.")
-                    onError("Permissão para acessar a galeria não foi concedida.")
-                    return
-                }
-                println("MokoTest: Permission.GALLERY granted after request.")
-            } else {
-                println("MokoTest: Permission.GALLERY already granted.")
-            }
-
-            println("MokoTest: About to call mediaPickerController.pickFiles()")
-            val fileMedia: FileMedia = mediaPickerController.pickFiles()
-            println("MokoTest: mediaPickerController.pickFiles() returned: ${fileMedia.name}, Path: ${fileMedia.path}")
-
-            val filePath = fileMedia.path
-            val fileName = fileMedia.name
-
-            val extension = fileName.substringAfterLast('.', "").lowercase()
-            val inferredMimeType = when (extension) {
-                "jpg", "jpeg" -> "image/jpeg"
-                "png" -> "image/png"
-                "gif" -> "image/gif"
-                "webp" -> "image/webp"
-                else -> null
-            }
-            println("MokoTest: File: $fileName, Extension: $extension, MimeType: $inferredMimeType")
-
-            if (inferredMimeType?.startsWith("image/") == true) {
-                val fileSize = 0L // O tamanho ainda precisa ser obtido por outros meios
-                val imageFile = ImageFile(
-                    uri = filePath,
-                    name = fileName,
-                    mimeType = inferredMimeType,
-                    size = fileSize
-                )
-                onImagesUpdated(currentImages + imageFile)
-                println("MokoTest: Image processed and updated.")
-            } else {
-                println("MokoTest: Not an image file or unknown type. Extension: .$extension, MimeType: $inferredMimeType")
-                onError("Por favor, selecione um arquivo de imagem. Extensão detectada: .$extension (Tipo MIME inferido: ${inferredMimeType ?: "desconhecido"})")
-            }
-        } catch (e: DeniedException) {
-            println("MokoTest: DeniedException: ${e.message}")
-            e.printStackTrace()
-            onError("Permissão para acessar a galeria foi negada.")
-        } catch (e: DeniedAlwaysException) {
-            println("MokoTest: DeniedAlwaysException: ${e.message}")
-            e.printStackTrace()
-            onError("Permissão para acessar a galeria foi negada permanentemente. Por favor, habilite nas configurações do app.")
-        } catch (e: Exception) {
-            println("MokoTest: Generic Exception in pickImageAndUpdateList: ${e::class.simpleName} - ${e.message}")
-            e.printStackTrace()
-            if (e.message?.contains("cancel", ignoreCase = true) == true ||
-                e::class.simpleName?.contains("Cancel", ignoreCase = true) == true ||
-                e.message?.contains("No file chosen", ignoreCase = true) == true ||
-                e.message?.contains("User cancelled", ignoreCase = true) == true
-            ) {
-                println("MokoTest: User cancelled picker or no file chosen.")
-            } else {
-                onError("Erro ao selecionar imagem: ${e.message ?: "Desconhecido"}")
             }
         }
     }

@@ -1,26 +1,32 @@
 package br.com.omnidevs.gcsn.network.api
 
+import BlobRefRequest
+import EmbedRequest
+import ImageDetailRequest
+import LinkRef
 import br.com.omnidevs.gcsn.model.Feed
+import br.com.omnidevs.gcsn.model.ImageFile
 import br.com.omnidevs.gcsn.model.Label
+import br.com.omnidevs.gcsn.model.LabelObject
 import br.com.omnidevs.gcsn.model.actor.Actor
-import br.com.omnidevs.gcsn.model.post.PostRef
-import br.com.omnidevs.gcsn.model.post.Record
 import br.com.omnidevs.gcsn.model.post.CreatePostRequest
-import br.com.omnidevs.gcsn.model.post.embed.Blob
+import br.com.omnidevs.gcsn.model.post.PostRef
+import br.com.omnidevs.gcsn.model.post.RecordRequest
+import br.com.omnidevs.gcsn.model.post.RequestLabels
 import br.com.omnidevs.gcsn.model.post.embed.BlobResponse
-import br.com.omnidevs.gcsn.model.post.embed.Embed
-import br.com.omnidevs.gcsn.model.post.embed.ImageDetail
 import br.com.omnidevs.gcsn.network.HttpClientProvider
 import br.com.omnidevs.gcsn.util.AppDependencies
-import br.com.omnidevs.gcsn.util.AuthService
+import br.com.omnidevs.gcsn.util.ImageCompressor
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.Json
 
 class BlueskyApi {
 
@@ -49,43 +55,60 @@ class BlueskyApi {
         return response.body()
     }
 
-    private suspend fun uploadBlob(imageUri: String): BlobResponse {
+    private suspend fun uploadBlob(imageUri: String, mimeType: String? = null): Pair<BlobResponse, String> {
         val authService = AppDependencies.authService
         val isValid = authService.validateToken()
         if (!isValid) {
             throw IllegalStateException("Sessão inválida ou expirada. Por favor, faça login novamente.")
         }
 
-        val imageBytes = getImageBytesFromUri(imageUri)
+        // Get original image bytes
+        val originalBytes = getImageBytesFromUri(imageUri)
 
-        val mimeType = when {
-            imageUri.endsWith(".jpg", true) || imageUri.endsWith(".jpeg", true) -> "image/jpeg"
-            imageUri.endsWith(".png", true) -> "image/png"
-            imageUri.endsWith(".gif", true) -> "image/gif"
-            imageUri.endsWith(".webp", true) -> "image/webp"
-            else -> "image/jpeg" // Fallback padrão
-        }
+        // Compress image before uploading - uses platform-specific implementation
+        val compressedBytes = ImageCompressor.compressImage(originalBytes, 900)
 
-        // Enviar para a API
+        // Our compression always outputs JPEG format
+        val determinedMimeType = "image/jpeg"
+
+        println("Original size: ${originalBytes.size / 1024}KB, Compressed: ${compressedBytes.size / 1024}KB")
+
+        // Send to API
         val response = client.post("https://bsky.social/xrpc/com.atproto.repo.uploadBlob") {
-            header(HttpHeaders.ContentType, mimeType)
-            setBody(imageBytes)
+            header(HttpHeaders.ContentType, determinedMimeType)
+            setBody(compressedBytes)
         }
 
-        return response.body<BlobResponse>()
+        return Pair(response.body<BlobResponse>(), determinedMimeType)
     }
 
-    suspend fun createPost(text: String, images: List<String> = emptyList()): PostRef {
+    suspend fun createPost(text: String, images: List<ImageFile>): PostRef {
         // Processar as imagens, se houver
         val embed = if (images.isNotEmpty()) {
-            val imageDetails = images.map { imageUri ->
-                val blobResponse = uploadBlob(imageUri)
-                ImageDetail(
-                    alt = "",
-                    image = blobResponse.blob.toBlobImage()
-                )
+            val imageDetailRequests = images.mapNotNull { imageFile ->
+                try {
+                    val (blobResponse, actualMimeType) = uploadBlob(
+                        imageUri = imageFile.uri,
+                        mimeType = imageFile.mimeType
+                    )
+
+                    ImageDetailRequest(
+                        alt = "",
+                        image = BlobRefRequest.Blob(
+                            ref = LinkRef(link = blobResponse.blob.ref.link),
+                            mimeType = actualMimeType,  // Use the actual MIME type from upload
+                            size = blobResponse.blob.size
+                        )
+                    )
+                } catch (_: Exception) {
+                    null
+                }
             }
-            Embed.Image(images = imageDetails)
+
+            if (imageDetailRequests.isEmpty()) null
+            else EmbedRequest.Images(
+                images = imageDetailRequests
+            )
         } else null
 
         val timestamp = Clock.System.now().toString()
@@ -96,7 +119,7 @@ class BlueskyApi {
         val createPostRequest = CreatePostRequest(
             repo = did,
             collection = "app.bsky.feed.post",
-            record = Record(
+            record = RecordRequest(
                 type = "app.bsky.feed.post",
                 text = text,
                 createdAt = timestamp,
@@ -105,27 +128,48 @@ class BlueskyApi {
                 reply = null,
                 langs = emptyList(),
                 tags = null,
-                labels = emptyList()
-
+                labels = RequestLabels(
+                    type = "com.atproto.label.defs#selfLabels",
+                    values = listOf(
+                        Label(value = "gcsn"),
+                        Label(value = "cosplay")
+                    )
+                )
             )
         )
+        val jsonString = Json.encodeToString(CreatePostRequest.serializer(), createPostRequest)
+        println("Request payload: $jsonString")
 
-        return client.post("https://bsky.social/xrpc/com.atproto.repo.createRecord") {
+        val response = client.post("https://bsky.social/xrpc/com.atproto.repo.createRecord") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(createPostRequest)
-        }.body()
-    }
-    private fun Blob.toBlobImage(): Embed.BlobImage {
-        return Embed.BlobImage(
-            type = type,
-            ref = Embed.BlobRef(link = ref.link),
-            mimeType = mimeType,
-            size = size
-        )
+        }
+
+        try {
+            // Log raw response for debugging
+            val responseText = response.bodyAsText()
+            println("API Response: $responseText")
+
+            // Use kotlinx.serialization to parse the response
+            return Json {
+                encodeDefaults = true
+                ignoreUnknownKeys = true
+                isLenient = true
+                allowSpecialFloatingPointValues = true
+                useArrayPolymorphism = false
+            }.decodeFromString(responseText)
+        } catch (e: Exception) {
+            println("Error parsing response: ${e.message}")
+            e.printStackTrace()
+            throw IllegalStateException("Failed to parse API response", e)
+        }
+
     }
 
+
+
     private suspend fun getImageBytesFromUri(imageUri: String): ByteArray {
-        return AppDependencies.mediaContentReader.getMediaBytes(imageUri)
+        return getCachedBytes(imageUri) ?: AppDependencies.mediaContentReader.getMediaBytes(imageUri)
     }
 
     suspend fun getTimeline(limit: Int = 20, cursor: String? = null): Feed {
@@ -142,7 +186,7 @@ class BlueskyApi {
 //        }.body()
 //    }
 
-//    suspend fun follow(authorization: String, actor: String): FollowResponse {
+    //    suspend fun follow(authorization: String, actor: String): FollowResponse {
 //        return client.post("xrpc/app.bsky.graph.follow") {
 //            header(HttpHeaders.Authorization, authorization)
 //            contentType(ContentType.Application.Json)
@@ -205,4 +249,19 @@ class BlueskyApi {
 //            url.parameters.append("handle", handle)
 //        }.body()
 //    }
+    companion object {
+        private val imageByteCache = mutableMapOf<String, ByteArray>()
+
+        fun cacheImageBytes(uri: String, bytes: ByteArray) {
+            imageByteCache[uri] = bytes
+        }
+
+        fun getCachedBytes(uri: String): ByteArray? {
+            return imageByteCache[uri]
+        }
+
+        fun clearCache() {
+            imageByteCache.clear()
+        }
+    }
 }

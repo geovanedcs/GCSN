@@ -184,9 +184,9 @@ sealed class Embed {
     @Serializable
     data class ExternalEmbedView(
         val uri: String, // The URL
-        val title: String, // Title of the linked content
-        val description: String, // Description of the linked content
-        val thumb: String? // Thumbnail for the linked content
+        val title: String,
+        val description: String,
+        val thumb: String?
     )
 
     @Serializable

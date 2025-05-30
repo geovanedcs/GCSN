@@ -9,9 +9,17 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 object HttpClientProvider {
+    val json = Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+        isLenient = true
+        allowSpecialFloatingPointValues = true
+        useArrayPolymorphism = false
+        explicitNulls = false
+    }
     val client: HttpClient = HttpClient {
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
+            json(json)
         }
         defaultRequest {
             AuthManager.accessToken?.let { token ->

@@ -10,6 +10,14 @@ data class ReplyRef(
 
 @Serializable
 data class PostRef(
-    val uri: String,
-    val cid: String
+    val uri: String?,
+    val cid: String?,
+    val commit: Commit? = null,
+    val validationStatus: String? = null
+)
+
+@Serializable
+data class Commit(
+    val cid: String,
+    val rev: String
 )

@@ -21,8 +21,6 @@ import br.com.omnidevs.gcsn.util.ApplicationContext
 import br.com.omnidevs.gcsn.util.SecureStorageProvider
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.SlideTransition
-import dev.icerock.moko.media.picker.MediaPickerController
-import dev.icerock.moko.permissions.PermissionsController
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,24 +29,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        val permissionsController = PermissionsController(
-            applicationContext = applicationContext
-        )
-
-        val mediaPickerController = MediaPickerController(
-            permissionsController = permissionsController,
-            pickerFragmentTag = "MEDIA_PICKER_TAG",
-            filePickerFragmentTag = "FILE_PICKER_TAG",
-        )
-
         val secureStorageProvider = SecureStorageProvider(applicationContext)
         val mediaContentReader = AndroidMediaContentReader()
 
         AppDependencies.initialize(
             secureStorageProvider = secureStorageProvider,
-            mediaPickerControllerProvider = mediaPickerController,
             mediaContentReaderProvider = mediaContentReader,
-            permissionsControllerProvider = permissionsController
         )
 
         setContent {
