@@ -24,4 +24,9 @@ data class SubjectRef(
     val cid: String
 )
 
-// Similar para UnlikeRequest, FollowRequest, etc.
+@Serializable
+data class UnlikeRequest(
+    val repo: String,
+    val collection: String,
+    val rkey: String
+)

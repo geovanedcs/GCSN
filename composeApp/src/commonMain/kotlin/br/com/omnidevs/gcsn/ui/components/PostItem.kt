@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -19,10 +17,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Reply
-import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,25 +39,81 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import br.com.omnidevs.gcsn.model.post.Post
+import br.com.omnidevs.gcsn.model.FeedItem
+import br.com.omnidevs.gcsn.model.RepostReason
+import br.com.omnidevs.gcsn.model.post.PostOrBlockedPost
+import br.com.omnidevs.gcsn.model.post.PostOrBlockedPost.Post
 import br.com.omnidevs.gcsn.model.post.embed.Embed
 import br.com.omnidevs.gcsn.util.DateUtils
 import coil3.compose.AsyncImage
-import coil3.compose.SubcomposeAsyncImage
 import gcsn.composeapp.generated.resources.Res
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 
 @OptIn(ExperimentalResourceApi::class)
 @Composable
 fun PostItem(
-    post: Post,
-    onAuthorClick: (String) -> Unit = {}
+    feedItem: FeedItem,
+    onAuthorClick: (String) -> Unit = {},
+    onLikeClick: (Post, Boolean) -> Unit = { _, _ -> },
+    onParentClick: (String) -> Unit = {},
+    showConfirmationDialog: ((String, String, String, ConfirmationDialogType, () -> Unit) -> Unit)? = null
 ) {
+    val post = feedItem.post
+    var isLiked by remember { mutableStateOf(post.viewer?.like != null) }
+    var likeCount by remember { mutableIntStateOf(post.likeCount) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
     ) {
+        // Display repost information if available
+        if (feedItem.reason is RepostReason) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Repeat,
+                    contentDescription = "Repostado",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Repostado por ${feedItem.reason.by.displayName ?: feedItem.reason.by.handle}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.clickable { onAuthorClick(feedItem.reason.by.did) }
+                )
+            }
+        }
+
+        // Display reply information if available
+        feedItem.reply?.let { reply ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Reply,
+                    contentDescription = "Respondendo a",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                val parentPost = reply.parent
+                if(parentPost is Post){
+                    Text(
+                        text = "Respondendo a ${parentPost.author.displayName ?: parentPost.author.handle}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.clickable { onParentClick(parentPost.uri) }
+                    )
+                }
+            }
+        }
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -120,7 +174,7 @@ fun PostItem(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 450.dp)
+                        .heightIn(max = 400.dp)
                         .clip(MaterialTheme.shapes.medium),
                     contentAlignment = Alignment.Center
                 ) {
@@ -145,7 +199,11 @@ fun PostItem(
             PostAction(
                 icon = Icons.Filled.Reply,
                 count = post.replyCount,
-                contentDescription = "Replies"
+                contentDescription = "Replies",
+                onClick = {
+                    // Navigate to thread view when clicking on replies
+                    onParentClick(post.uri)
+                }
             )
             PostAction(
                 icon = Icons.Filled.Repeat,
@@ -153,12 +211,39 @@ fun PostItem(
                 contentDescription = "Reposts"
             )
             PostAction(
-                icon = Icons.Filled.FavoriteBorder,
-                count = post.likeCount,
-                contentDescription = "Likes"
+                icon = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                count = likeCount,
+                contentDescription = if (isLiked) "Unlike" else "Like",
+                tint = if (isLiked)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                onClick = {
+                    val wasLiked = isLiked
+
+                    if (wasLiked && showConfirmationDialog != null) {
+                        // Show confirmation dialog for unliking
+                        showConfirmationDialog(
+                            "Remover curtida",
+                            "Tem certeza que deseja remover sua curtida desta postagem?",
+                            "Remover",
+                            ConfirmationDialogType.NORMAL
+                        ) {
+                            // This block runs when user confirms the action
+                            isLiked = false
+                            likeCount -= 1
+                            onLikeClick(post, false)
+                        }
+                    } else {
+                        // For liking, no confirmation needed
+                        isLiked = !isLiked
+                        likeCount += if (isLiked) 1 else -1
+                        onLikeClick(post, !wasLiked)
+                    }
+                }
             )
         }
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        Spacer(modifier = Modifier.padding(vertical = 8.dp))
     }
 }
 
@@ -169,7 +254,7 @@ fun ImageCarousel(images: List<Embed.ImageView>) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = 450.dp)
+            .heightIn(max = 400.dp)
             .clip(MaterialTheme.shapes.medium),
         contentAlignment = Alignment.Center
     ) {
@@ -253,9 +338,16 @@ fun PostAction(
     icon: ImageVector,
     count: Int,
     contentDescription: String,
-    tint: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+    tint: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+    onClick: (() -> Unit)? = null
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .padding(4.dp)
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,

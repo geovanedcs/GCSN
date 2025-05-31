@@ -44,6 +44,8 @@ import br.com.omnidevs.gcsn.model.Feed
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.ui.components.CommonBottomBar
 import br.com.omnidevs.gcsn.ui.components.CommonFAB
+import br.com.omnidevs.gcsn.ui.components.ConfirmationDialog
+import br.com.omnidevs.gcsn.ui.components.ConfirmationDialogType
 import br.com.omnidevs.gcsn.ui.components.InfiniteScrollHandler
 import br.com.omnidevs.gcsn.ui.components.LoadingIndicator
 import br.com.omnidevs.gcsn.ui.components.PostItem
@@ -71,6 +73,25 @@ class DiscoverScreen : Screen {
         val blueskyApi = remember { BlueskyApi() }
         val authService = AppDependencies.authService
         val listState = rememberLazyListState()
+
+        // Dialog state
+        var showConfirmationDialog by remember { mutableStateOf(false) }
+        var dialogTitle by remember { mutableStateOf("") }
+        var dialogMessage by remember { mutableStateOf("") }
+        var dialogConfirmText by remember { mutableStateOf("") }
+        var dialogType by remember { mutableStateOf(ConfirmationDialogType.NORMAL) }
+        var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+        // Function to show the dialog
+        val showDialog = { title: String, message: String, confirmText: String,
+                           type: ConfirmationDialogType, action: () -> Unit ->
+            dialogTitle = title
+            dialogMessage = message
+            dialogConfirmText = confirmText
+            dialogType = type
+            pendingAction = action
+            showConfirmationDialog = true
+        }
 
         val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
         val bottomBarState = remember { derivedStateOf { scrollBehavior.state.heightOffset == 0f } }
@@ -205,10 +226,35 @@ class DiscoverScreen : Screen {
                         ) {
                             items(feed!!.feed) { feedViewPost ->
                                 PostItem(
-                                    post = feedViewPost.post,
+                                    feedItem = feedViewPost,
                                     onAuthorClick = { authorDid ->
                                         navigator?.push(ProfileScreen(authorDid))
-                                    }
+                                    },
+                                    onLikeClick = { post, isLiking ->
+                                        // Fixed like/unlike action
+                                        coroutineScope.launch {
+                                            try {
+                                                if (isLiking) {
+                                                    // Like the post
+                                                    blueskyApi.likePost(post.uri, post.cid)
+                                                } else {
+                                                    // Unlike the post - fix was needed here
+                                                    post.viewer?.like?.let { likeUri ->
+                                                        blueskyApi.unlikePost(likeUri)
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                snackbarHostState.showSnackbar(
+                                                    if (isLiking) "Falha ao curtir: ${e.message}"
+                                                    else "Falha ao remover curtida: ${e.message}"
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onParentClick = { postUri ->
+                                        navigator?.push(ThreadScreen(postUri))
+                                    },
+                                    showConfirmationDialog = showDialog
                                 )
                             }
 
@@ -254,6 +300,21 @@ class DiscoverScreen : Screen {
                             }
                         )
                     }
+                }
+
+                // Display the confirmation dialog when needed
+                if (showConfirmationDialog) {
+                    ConfirmationDialog(
+                        title = dialogTitle,
+                        message = dialogMessage,
+                        confirmButtonText = dialogConfirmText,
+                        onConfirm = {
+                            pendingAction?.invoke()
+                            showConfirmationDialog = false
+                        },
+                        onDismiss = { showConfirmationDialog = false },
+                        type = dialogType
+                    )
                 }
             }
         }

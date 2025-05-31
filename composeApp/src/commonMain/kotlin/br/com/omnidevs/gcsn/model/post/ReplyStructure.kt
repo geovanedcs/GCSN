@@ -1,6 +1,7 @@
 package br.com.omnidevs.gcsn.model.post
 
 import br.com.omnidevs.gcsn.model.actor.Author
+import br.com.omnidevs.gcsn.model.post.PostOrBlockedPost.Post
 import kotlinx.serialization.Serializable
 
 @Serializable

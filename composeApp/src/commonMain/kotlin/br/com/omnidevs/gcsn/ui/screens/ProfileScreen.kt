@@ -1,9 +1,9 @@
 package br.com.omnidevs.gcsn.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,9 +49,13 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
 import br.com.omnidevs.gcsn.model.actor.Actor
+import br.com.omnidevs.gcsn.model.post.PostOrBlockedPost.Post
+import br.com.omnidevs.gcsn.model.post.Viewer
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.ui.components.CommonBottomBar
 import br.com.omnidevs.gcsn.ui.components.CommonFAB
+import br.com.omnidevs.gcsn.ui.components.ConfirmationDialog
+import br.com.omnidevs.gcsn.ui.components.ConfirmationDialogType
 import br.com.omnidevs.gcsn.ui.components.InfiniteScrollHandler
 import br.com.omnidevs.gcsn.ui.components.LoadingIndicator
 import br.com.omnidevs.gcsn.ui.components.PostItem
@@ -81,9 +85,29 @@ class ProfileScreen(
         var actor by remember { mutableStateOf<Actor?>(null) }
         var feed by remember { mutableStateOf<Feed?>(null) }
         var isLoading by remember { mutableStateOf(true) }
+        var isFollowLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var currentTab by remember { mutableStateOf<TabItem>(TabItem.ProfileTab) }
         var isOwnProfile by remember { mutableStateOf(false) }
+
+        // Dialog state
+        var showConfirmationDialog by remember { mutableStateOf(false) }
+        var dialogTitle by remember { mutableStateOf("") }
+        var dialogMessage by remember { mutableStateOf("") }
+        var dialogConfirmText by remember { mutableStateOf("") }
+        var dialogType by remember { mutableStateOf(ConfirmationDialogType.NORMAL) }
+        var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+        // Function to show the dialog
+        val showDialog = { title: String, message: String, confirmText: String,
+                           type: ConfirmationDialogType, action: () -> Unit ->
+            dialogTitle = title
+            dialogMessage = message
+            dialogConfirmText = confirmText
+            dialogType = type
+            pendingAction = action
+            showConfirmationDialog = true
+        }
 
         // Estado para controlar a visibilidade do header
         val lazyListState = rememberLazyListState()
@@ -226,7 +250,49 @@ class ProfileScreen(
                                     exit = fadeOut() + shrinkVertically()
                                 ) {
                                     Column {
-                                        ProfileHeader(actor = actor!!)
+                                        ProfileHeader(
+                                            actor = actor!!,
+                                            isOwnProfile = isOwnProfile,
+                                            isLoading = isFollowLoading,
+                                            onFollowClick = { shouldFollow ->
+                                                // Fixed unfollow action
+                                                coroutineScope.launch {
+                                                    isFollowLoading = true
+                                                    try {
+                                                        if (shouldFollow) {
+                                                            // Follow the user
+                                                            val followResponse =
+                                                                blueskyApi.followUser(actor!!.did)
+                                                            // Update actor with new follow state
+                                                            actor = actor!!.copy(
+                                                                viewer = actor!!.viewer?.copy(
+                                                                    following = followResponse.uri
+                                                                )
+                                                                    ?: Viewer(following = followResponse.uri)
+                                                            )
+                                                        } else {
+                                                            // Unfollow the user
+                                                            actor!!.viewer?.following?.let { followingUri ->
+                                                                blueskyApi.unfollowUser(followingUri)
+                                                                actor = actor!!.copy(
+                                                                    viewer = actor!!.viewer.copy(
+                                                                        following = null
+                                                                    )
+                                                                )
+                                                            }
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        snackbarHostState.showSnackbar(
+                                                            if (shouldFollow) "Falha ao seguir: ${e.message}"
+                                                            else "Falha ao deixar de seguir: ${e.message}"
+                                                        )
+                                                    } finally {
+                                                        isFollowLoading = false
+                                                    }
+                                                }
+                                            },
+                                            showConfirmationDialog = showDialog
+                                        )
                                         Spacer(modifier = Modifier.height(16.dp))
                                     }
                                 }
@@ -235,10 +301,35 @@ class ProfileScreen(
                             feed?.let { userFeed ->
                                 items(userFeed.feed) { feedViewPost ->
                                     PostItem(
-                                        post = feedViewPost.post,
+                                        feedItem = feedViewPost,
                                         onAuthorClick = { authorDid ->
                                             navigator?.push(ProfileScreen(authorDid))
-                                        }
+                                        },
+                                        onLikeClick = { post, isLiking ->
+                                            // Fixed unlike action
+                                            coroutineScope.launch {
+                                                try {
+                                                    if (isLiking) {
+                                                        // Like the post
+                                                        blueskyApi.likePost(post.uri, post.cid)
+                                                    } else {
+                                                        // Unlike the post
+                                                        post.viewer?.like?.let { likeUri ->
+                                                            blueskyApi.unlikePost(likeUri)
+                                                        }
+                                                    }
+                                                } catch (e: Exception) {
+                                                    snackbarHostState.showSnackbar(
+                                                        if (isLiking) "Falha ao curtir: ${e.message}"
+                                                        else "Falha ao remover curtida: ${e.message}"
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        onParentClick = { postUri ->
+                                            navigator?.push(ThreadScreen(postUri))
+                                        },
+                                        showConfirmationDialog = showDialog
                                     )
                                 }
                             }
@@ -284,6 +375,21 @@ class ProfileScreen(
                             }
                         )
                     }
+                }
+
+                // Display the confirmation dialog when needed
+                if (showConfirmationDialog) {
+                    ConfirmationDialog(
+                        title = dialogTitle,
+                        message = dialogMessage,
+                        confirmButtonText = dialogConfirmText,
+                        onConfirm = {
+                            pendingAction?.invoke()
+                            showConfirmationDialog = false
+                        },
+                        onDismiss = { showConfirmationDialog = false },
+                        type = dialogType
+                    )
                 }
             }
         }

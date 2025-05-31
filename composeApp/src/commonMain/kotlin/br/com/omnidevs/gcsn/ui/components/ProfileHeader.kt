@@ -1,9 +1,6 @@
 package br.com.omnidevs.gcsn.ui.components
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,170 +8,130 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
 import br.com.omnidevs.gcsn.model.actor.Actor
-import br.com.omnidevs.gcsn.util.AppDependencies
-import br.com.omnidevs.gcsn.util.AuthService
 import coil3.compose.AsyncImage
-import gcsn.composeapp.generated.resources.Res
-import gcsn.composeapp.generated.resources.avatarMasc
-import gcsn.composeapp.generated.resources.banner
-import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun ProfileHeader(actor: Actor) {
-    val showPopup = remember { mutableStateOf(false) }
-    val isOwnProfile = remember {
-        val userData = AppDependencies.authService.getUserData()
-        userData?.handle == actor.handle
-    }
+fun ProfileHeader(
+    actor: Actor,
+    isOwnProfile: Boolean = false,
+    isLoading: Boolean = false,
+    onFollowClick: (Boolean) -> Unit = {},
+    showConfirmationDialog: ((String, String, String, ConfirmationDialogType, () -> Unit) -> Unit)? = null
+) {
+    val isFollowing = actor.viewer?.following != null
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(250.dp)
     ) {
-        if (actor.banner?.isNotEmpty() == true) {
+        // Banner image (if available)
+        actor.banner?.let { banner ->
             AsyncImage(
-                model = actor.banner.toString(),
-                contentDescription = "Banner",
-                contentScale = ContentScale.Crop,
+                model = banner,
+                contentDescription = "Banner de ${actor.displayName ?: actor.handle}",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
+                    .height(150.dp),
+                contentScale = ContentScale.Crop
             )
-        } else {
-            Image(
-                painter = painterResource(Res.drawable.banner),
-                contentDescription = "Banner",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp)
-            )
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // Avatar and profile info
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.Top,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (actor.avatar?.isNotEmpty() == true) {
-                    AsyncImage(
-                        model = actor.avatar.toString(),
-                        contentDescription = "Avatar",
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(Res.drawable.avatarMasc),
-                        contentDescription = "Avatar",
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                    )
-                }
-            }
+            // Avatar
+            AsyncImage(
+                model = actor.avatar,
+                contentDescription = "Avatar de ${actor.displayName ?: actor.handle}",
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
 
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Display name and handle
             Column(
-                modifier = Modifier.weight(2f),
-                horizontalAlignment = Alignment.Start
+                modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = actor.displayName ?: actor.handle,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
                 )
                 Text(
                     text = "@${actor.handle}",
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                actor.description?.let {
+
+                // Follow/follower counts
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        text = it,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp)
+                        text = "${actor.followsCount} seguindo",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "${actor.followersCount} seguidores",
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    ProfileStat(label = "Seguidores", value = actor.followersCount)
-                    ProfileStat(label = "Seguindo", value = actor.followsCount)
-                    ProfileStat(label = "Posts", value = actor.postsCount)
+
+                // Description
+                actor.description?.let { description ->
+                    if (description.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
-        }
 
-        if (isOwnProfile == true) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-            ) {
-                Text(
-                    text = "Editar perfil",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.small)
-                        .clickable { showPopup.value = true }
-                        .padding(8.dp)
+            // Follow button (only show if not viewing own profile)
+            if (!isOwnProfile) {
+                Spacer(modifier = Modifier.width(8.dp))
+                FollowButton(
+                    isFollowing = isFollowing,
+                    isLoading = isLoading,
+                    onClick = {
+                        if (isFollowing && showConfirmationDialog != null) {
+                            // Show confirmation dialog when unfollowing
+                            val displayName = actor.displayName ?: actor.handle
+                            showConfirmationDialog(
+                                "Deixar de seguir",
+                                "Tem certeza que deseja deixar de seguir @$displayName?",
+                                "Deixar de seguir",
+                                ConfirmationDialogType.WARNING
+                            ) {
+                                // This executes when the user confirms
+                                onFollowClick(false)
+                            }
+                        } else {
+                            // Follow directly without confirmation
+                            onFollowClick(!isFollowing)
+                        }
+                    }
                 )
             }
         }
-
-        if (showPopup.value) {
-            Popup(
-                alignment = Alignment.Center,
-                onDismissRequest = { showPopup.value = false }
-            ) {
-                ElevatedCard(
-                    modifier = Modifier
-                        .size(300.dp)
-                        .padding(16.dp)
-                ) {
-                    Text("Função não implementada ainda", modifier = Modifier.padding(16.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ProfileStat(label: String, value: Int) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = value.toString(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
     }
 }
