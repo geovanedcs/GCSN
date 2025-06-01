@@ -39,17 +39,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.FeedItem
+import br.com.omnidevs.gcsn.model.post.PostRef
+import br.com.omnidevs.gcsn.model.post.ReplyRef
 import br.com.omnidevs.gcsn.model.post.interactions.ThreadViewPost
-import br.com.omnidevs.gcsn.model.post.PostOrBlockedPost.Post
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.ui.components.ConfirmationDialog
 import br.com.omnidevs.gcsn.ui.components.ConfirmationDialogType
 import br.com.omnidevs.gcsn.ui.components.PostItem
+import br.com.omnidevs.gcsn.util.PostInteractionHandler
+import br.com.omnidevs.gcsn.util.SearchScreenWithQuery
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+
 
 class ThreadScreen(private val postUri: String) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -137,20 +140,24 @@ class ThreadScreen(private val postUri: String) : Screen {
 
                                 isSubmitting = true
                                 try {
-                                    // Extract the root post URI from threadView
-                                    val rootPostUri = threadView?.thread?.post?.uri
-                                    val rootPostCid = threadView?.thread?.post?.cid
-
-                                    if (rootPostUri != null && rootPostCid != null) {
-                                        // Submit reply
-//                                        blueskyApi.createPost(text = replyText, images = emptyList())
-
-                                        // Clear text field and refresh thread
+                                    val rootPost = threadView?.thread?.post
+                                    if (rootPost != null) {
+                                        blueskyApi.createPost(
+                                            text = replyText,
+                                            images = emptyList(),
+                                            reply = ReplyRef(
+                                                root = PostRef(
+                                                    uri = rootPost.uri,
+                                                    cid = rootPost.cid
+                                                ),
+                                                parent = PostRef(
+                                                    uri = rootPost.uri,
+                                                    cid = rootPost.cid
+                                                )
+                                            )
+                                        )
                                         replyText = ""
-
-                                        // Refresh the thread to show the new reply
                                         threadView = blueskyApi.getThreadView(postUri)
-
                                         snackbarHostState.showSnackbar("Resposta enviada com sucesso!")
                                     }
                                 } catch (e: Exception) {
@@ -216,19 +223,42 @@ class ThreadScreen(private val postUri: String) : Screen {
                                                     onAuthorClick = { authorDid ->
                                                         navigator.push(ProfileScreen(authorDid))
                                                     },
-                                                    onLikeClick = { post, isLiking ->
-                                                        handleLikeAction(
-                                                            post,
-                                                            isLiking,
-                                                            blueskyApi,
-                                                            coroutineScope,
-                                                            snackbarHostState,
-                                                            showDialog
+                                                    onLikeClick = { post, isLiking, onUpdate ->
+                                                        PostInteractionHandler.handleLikeAction(
+                                                            post = post,
+                                                            isLiking = isLiking,
+                                                            api = blueskyApi,
+                                                            scope = coroutineScope,
+                                                            snackbarHostState = snackbarHostState,
+                                                            showDialog = showDialog,
+                                                            onActionComplete = { updatedPost ->
+                                                                onUpdate(updatedPost)
+                                                            }
+                                                        )
+                                                    },
+                                                    onRepostClick = { post, isReposting, onUpdate ->
+                                                        PostInteractionHandler.handleRepostAction(
+                                                            post = post,
+                                                            isReposting = isReposting,
+                                                            api = blueskyApi,
+                                                            scope = coroutineScope,
+                                                            snackbarHostState = snackbarHostState,
+                                                            showDialog = showDialog,
+                                                            onActionComplete = { updatedPost ->
+                                                                onUpdate(updatedPost)
+                                                            }
                                                         )
                                                     },
                                                     onParentClick = { parentUri ->
                                                         navigator.push(ThreadScreen(parentUri))
                                                     },
+                                                    onTagClick = { tag ->
+                                                        navigator.push(SearchScreenWithQuery("#$tag"))
+                                                    },
+                                                    onMentionClick = { did ->
+                                                        navigator.push(ProfileScreen(did))
+                                                    },
+                                                    onLinkClick = { uri -> },
                                                     showConfirmationDialog = showDialog
                                                 )
                                             }
@@ -249,19 +279,42 @@ class ThreadScreen(private val postUri: String) : Screen {
                                             onAuthorClick = { authorDid ->
                                                 navigator.push(ProfileScreen(authorDid))
                                             },
-                                            onLikeClick = { post, isLiking ->
-                                                handleLikeAction(
-                                                    post,
-                                                    isLiking,
-                                                    blueskyApi,
-                                                    coroutineScope,
-                                                    snackbarHostState,
-                                                    showDialog
+                                            onLikeClick = { post, isLiking, onUpdate ->
+                                                PostInteractionHandler.handleLikeAction(
+                                                    post = post,
+                                                    isLiking = isLiking,
+                                                    api = blueskyApi,
+                                                    scope = coroutineScope,
+                                                    snackbarHostState = snackbarHostState,
+                                                    showDialog = showDialog,
+                                                    onActionComplete = { updatedPost ->
+                                                        onUpdate(updatedPost)
+                                                    }
+                                                )
+                                            },
+                                            onRepostClick = { post, isReposting, onUpdate ->
+                                                PostInteractionHandler.handleRepostAction(
+                                                    post = post,
+                                                    isReposting = isReposting,
+                                                    api = blueskyApi,
+                                                    scope = coroutineScope,
+                                                    snackbarHostState = snackbarHostState,
+                                                    showDialog = showDialog,
+                                                    onActionComplete = { updatedPost ->
+                                                        onUpdate(updatedPost)
+                                                    }
                                                 )
                                             },
                                             onParentClick = { parentUri ->
                                                 navigator.push(ThreadScreen(parentUri))
                                             },
+                                            onTagClick = { tag ->
+                                                navigator.push(SearchScreenWithQuery("#$tag"))
+                                            },
+                                            onMentionClick = { did ->
+                                                navigator.push(ProfileScreen(did))
+                                            },
+                                            onLinkClick = { uri -> },
                                             showConfirmationDialog = showDialog
                                         )
                                     }
@@ -281,28 +334,49 @@ class ThreadScreen(private val postUri: String) : Screen {
                                                 onAuthorClick = { authorDid ->
                                                     navigator.push(ProfileScreen(authorDid))
                                                 },
-                                                onLikeClick = { post, isLiking ->
-                                                    handleLikeAction(
-                                                        post,
-                                                        isLiking,
-                                                        blueskyApi,
-                                                        coroutineScope,
-                                                        snackbarHostState,
-                                                        showDialog
+                                                onLikeClick = { post, isLiking, onUpdate ->
+                                                    PostInteractionHandler.handleLikeAction(
+                                                        post = post,
+                                                        isLiking = isLiking,
+                                                        api = blueskyApi,
+                                                        scope = coroutineScope,
+                                                        snackbarHostState = snackbarHostState,
+                                                        showDialog = showDialog,
+                                                        onActionComplete = { updatedPost ->
+                                                            onUpdate(updatedPost)
+                                                        }
+                                                    )
+                                                },
+                                                onRepostClick = { post, isReposting, onUpdate ->
+                                                    PostInteractionHandler.handleRepostAction(
+                                                        post = post,
+                                                        isReposting = isReposting,
+                                                        api = blueskyApi,
+                                                        scope = coroutineScope,
+                                                        snackbarHostState = snackbarHostState,
+                                                        showDialog = showDialog,
+                                                        onActionComplete = { updatedPost ->
+                                                            onUpdate(updatedPost)
+                                                        }
                                                     )
                                                 },
                                                 onParentClick = { parentUri ->
                                                     navigator.push(ThreadScreen(parentUri))
                                                 },
+                                                onTagClick = { tag ->
+                                                    navigator.push(SearchScreenWithQuery("#$tag"))
+                                                },
+                                                onMentionClick = { did ->
+                                                    navigator.push(ProfileScreen(did))
+                                                },
+                                                onLinkClick = { uri -> },
                                                 showConfirmationDialog = showDialog
                                             )
                                         }
-                                        // Add spacer between replies
                                         Spacer(modifier = Modifier.height(12.dp))
                                     }
                                 }
 
-                                // Add some space at the bottom
                                 item {
                                     Spacer(modifier = Modifier.height(16.dp))
                                 }
@@ -311,7 +385,6 @@ class ThreadScreen(private val postUri: String) : Screen {
                     }
                 }
 
-                // Display loading overlay when submitting reply
                 if (isSubmitting) {
                     Box(
                         modifier = Modifier
@@ -323,7 +396,6 @@ class ThreadScreen(private val postUri: String) : Screen {
                     }
                 }
 
-                // Display the confirmation dialog when needed
                 if (showConfirmationDialog) {
                     ConfirmationDialog(
                         title = dialogTitle,
@@ -357,55 +429,6 @@ class ThreadScreen(private val postUri: String) : Screen {
                     .padding(start = 40.dp)
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
             )
-        }
-    }
-
-    private fun handleLikeAction(
-        post: Post,
-        isLiking: Boolean,
-        api: BlueskyApi,
-        scope: CoroutineScope,
-        snackbarHostState: SnackbarHostState,
-        showDialog: (String, String, String, ConfirmationDialogType, () -> Unit) -> Unit
-    ) {
-        if (!isLiking) {
-            // Show confirmation for unliking
-            showDialog(
-                "Remover curtida",
-                "Tem certeza que deseja remover sua curtida desta postagem?",
-                "Remover",
-                ConfirmationDialogType.NORMAL
-            ) {
-                performLikeAction(post, false, api, scope, snackbarHostState)
-            }
-        } else {
-            // No confirmation needed for liking
-            performLikeAction(post, true, api, scope, snackbarHostState)
-        }
-    }
-
-    private fun performLikeAction(
-        post: Post,
-        isLiking: Boolean,
-        api: BlueskyApi,
-        scope: CoroutineScope,
-        snackbarHostState: SnackbarHostState
-    ) {
-        scope.launch {
-            try {
-                if (isLiking) {
-                    api.likePost(post.uri, post.cid)
-                } else {
-                    post.viewer?.like?.let { likeUri ->
-                        api.unlikePost(likeUri)
-                    }
-                }
-            } catch (e: Exception) {
-                snackbarHostState.showSnackbar(
-                    if (isLiking) "Falha ao curtir: ${e.message}"
-                    else "Falha ao descurtir: ${e.message}"
-                )
-            }
         }
     }
 }

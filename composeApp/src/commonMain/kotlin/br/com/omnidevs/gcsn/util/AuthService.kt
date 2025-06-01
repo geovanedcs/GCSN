@@ -35,10 +35,10 @@ class AuthService(private val secureStorage: SecureStorage) {
                 val refreshResponse = authApi.refreshToken(refreshToken)
 
                 if (refreshResponse != null &&
-                    !refreshResponse.accessJwt.isNullOrEmpty() &&
-                    !refreshResponse.refreshJwt.isNullOrEmpty() &&
-                    !refreshResponse.did.isNullOrEmpty() &&
-                    !refreshResponse.handle.isNullOrEmpty()
+                    refreshResponse.accessJwt.isNotEmpty() &&
+                    refreshResponse.refreshJwt.isNotEmpty() &&
+                    refreshResponse.did.isNotEmpty() &&
+                    refreshResponse.handle.isNotEmpty()
                 ) {
 
                     saveUserData(

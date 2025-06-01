@@ -3,6 +3,7 @@ package br.com.omnidevs.gcsn.model.actor
 import br.com.omnidevs.gcsn.model.Label
 import kotlinx.serialization.Serializable
 
+
 @Serializable
 data class Author(
     val did: String,
@@ -11,5 +12,7 @@ data class Author(
     val avatar: String? = null,
     val viewer: AuthorViewer? = null,
     val labels: List<Label> = emptyList(),
+    val associated: Associated? = null,
     val createdAt: String
 )
+

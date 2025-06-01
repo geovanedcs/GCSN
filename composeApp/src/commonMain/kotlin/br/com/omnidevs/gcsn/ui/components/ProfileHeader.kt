@@ -29,11 +29,13 @@ fun ProfileHeader(
     onFollowClick: (Boolean) -> Unit = {},
     showConfirmationDialog: ((String, String, String, ConfirmationDialogType, () -> Unit) -> Unit)? = null
 ) {
+    // Safe access to viewer.following with null check
     val isFollowing = actor.viewer?.following != null
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp)
     ) {
         // Banner image (if available)
         actor.banner?.let { banner ->
@@ -122,12 +124,12 @@ fun ProfileHeader(
                                 "Deixar de seguir",
                                 ConfirmationDialogType.WARNING
                             ) {
-                                // This executes when the user confirms
-                                onFollowClick(false)
+                                // This executes when the user confirms the unfollow action
+                                onFollowClick(true)  // true indicates we're currently following
                             }
                         } else {
                             // Follow directly without confirmation
-                            onFollowClick(!isFollowing)
+                            onFollowClick(isFollowing)  // Pass current follow state
                         }
                     }
                 )

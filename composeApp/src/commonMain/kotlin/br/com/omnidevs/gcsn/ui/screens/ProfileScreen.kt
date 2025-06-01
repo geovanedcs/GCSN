@@ -6,12 +6,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -49,7 +47,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
 import br.com.omnidevs.gcsn.model.actor.Actor
-import br.com.omnidevs.gcsn.model.post.PostOrBlockedPost.Post
 import br.com.omnidevs.gcsn.model.post.Viewer
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
 import br.com.omnidevs.gcsn.ui.components.CommonBottomBar
@@ -65,6 +62,8 @@ import br.com.omnidevs.gcsn.util.AppDependencies
 import br.com.omnidevs.gcsn.util.AuthService
 import br.com.omnidevs.gcsn.util.AuthState
 import br.com.omnidevs.gcsn.util.AuthStateManager
+import br.com.omnidevs.gcsn.util.PostInteractionHandler
+import br.com.omnidevs.gcsn.util.SearchScreenWithQuery
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
@@ -164,7 +163,6 @@ class ProfileScreen(
                     actions = {
                         IconButton(onClick = {
                             coroutineScope.launch {
-                                // Validar autenticação antes de recarregar os dados
                                 if (!validateAuthentication(authService, navigator)) {
                                     return@launch
                                 }
@@ -197,7 +195,6 @@ class ProfileScreen(
                 )
             },
             floatingActionButton = {
-                // Mostrar FAB apenas se for o perfil do próprio usuário
                 if (isOwnProfile) {
                     CommonFAB(
                         isVisible = bottomBarState,
@@ -243,48 +240,108 @@ class ProfileScreen(
                             state = lazyListState,
                             modifier = Modifier.fillMaxSize()
                         ) {
+                            // Profile header
                             item {
                                 AnimatedVisibility(
-                                    visible = isHeaderVisible,
+                                    visible = isHeaderVisible || lazyListState.firstVisibleItemIndex == 0,
                                     enter = fadeIn() + expandVertically(),
                                     exit = fadeOut() + shrinkVertically()
                                 ) {
-                                    Column {
+                                    actor?.let { currentActor ->
                                         ProfileHeader(
-                                            actor = actor!!,
+                                            actor = currentActor,
                                             isOwnProfile = isOwnProfile,
                                             isLoading = isFollowLoading,
-                                            onFollowClick = { shouldFollow ->
-                                                // Fixed unfollow action
+                                            onFollowClick = { isCurrentlyFollowing ->
                                                 coroutineScope.launch {
+                                                    if (!validateAuthentication(
+                                                            authService,
+                                                            navigator
+                                                        )
+                                                    ) {
+                                                        return@launch
+                                                    }
+
                                                     isFollowLoading = true
                                                     try {
-                                                        if (shouldFollow) {
-                                                            // Follow the user
-                                                            val followResponse =
-                                                                blueskyApi.followUser(actor!!.did)
-                                                            // Update actor with new follow state
-                                                            actor = actor!!.copy(
-                                                                viewer = actor!!.viewer?.copy(
-                                                                    following = followResponse.uri
-                                                                )
-                                                                    ?: Viewer(following = followResponse.uri)
-                                                            )
-                                                        } else {
-                                                            // Unfollow the user
-                                                            actor!!.viewer?.following?.let { followingUri ->
-                                                                blueskyApi.unfollowUser(followingUri)
-                                                                actor = actor!!.copy(
-                                                                    viewer = actor!!.viewer.copy(
-                                                                        following = null
+                                                        if (isCurrentlyFollowing) {
+                                                            // IMPORTANT FIX: We need the follow URI, not just the DID
+                                                            // Get the following URI from the viewer
+                                                            val followingUri =
+                                                                currentActor.viewer?.following
+
+                                                            if (followingUri != null) {
+                                                                println("Unfollowing user with URI: $followingUri")
+                                                                // Call unfollowUser with the actual follow URI
+                                                                val success =
+                                                                    blueskyApi.unfollowUser(
+                                                                        followingUri
                                                                     )
-                                                                )
+
+                                                                if (success) {
+                                                                    // Update local state
+                                                                    val updatedViewer =
+                                                                        currentActor.viewer?.copy(
+                                                                            following = null
+                                                                        ) ?: Viewer(
+                                                                            following = null,
+                                                                            followedBy = null
+                                                                        )
+
+                                                                    actor =
+                                                                        currentActor.copy(viewer = updatedViewer)
+                                                                    snackbarHostState.showSnackbar(
+                                                                        "Deixou de seguir ${currentActor.displayName ?: currentActor.handle}"
+                                                                    )
+                                                                } else {
+                                                                    throw Exception("API returned unsuccessful result")
+                                                                }
+                                                            } else {
+                                                                throw Exception("Follow URI não encontrado")
                                                             }
+                                                        } else {
+                                                            // Follow action
+                                                            val result =
+                                                                blueskyApi.followUser(currentActor.did)
+
+                                                            // After following, we need to update the local state
+                                                            // The URI format should be "at://{my_did}/app.bsky.graph.follow/{rkey}"
+                                                            val followUri = result.uri
+
+                                                            // Update local state with the new follow URI
+                                                            val updatedViewer =
+                                                                currentActor.viewer?.copy(
+                                                                    following = followUri
+                                                                ) ?: Viewer(
+                                                                    following = followUri,
+                                                                    followedBy = null
+                                                                )
+
+                                                            actor =
+                                                                currentActor.copy(viewer = updatedViewer)
+                                                            snackbarHostState.showSnackbar(
+                                                                "Agora você segue ${currentActor.displayName ?: currentActor.handle}"
+                                                            )
                                                         }
                                                     } catch (e: Exception) {
-                                                        snackbarHostState.showSnackbar(
-                                                            if (shouldFollow) "Falha ao seguir: ${e.message}"
-                                                            else "Falha ao deixar de seguir: ${e.message}"
+                                                        val action =
+                                                            if (isCurrentlyFollowing) "deixar de seguir" else "seguir"
+                                                        println("Error ${action}: ${e.message}")
+                                                        e.printStackTrace()
+                                                        snackbarHostState.showSnackbar("Falha ao $action: ${e.message}")
+
+                                                        // Refresh profile data to ensure UI is consistent with server
+                                                        loadProfileData(
+                                                            blueskyApi = blueskyApi,
+                                                            handle = handle,
+                                                            onActorLoaded = { loadedActor ->
+                                                                actor = loadedActor
+                                                            },
+                                                            onFeedLoaded = { userFeed ->
+                                                                feed = userFeed
+                                                            },
+                                                            onError = { /* Ignore to avoid multiple errors */ },
+                                                            onComplete = { /* No action needed */ }
                                                         )
                                                     } finally {
                                                         isFollowLoading = false
@@ -293,61 +350,94 @@ class ProfileScreen(
                                             },
                                             showConfirmationDialog = showDialog
                                         )
-                                        Spacer(modifier = Modifier.height(16.dp))
                                     }
                                 }
+                                Spacer(modifier = Modifier.height(8.dp))
                             }
 
-                            feed?.let { userFeed ->
-                                items(userFeed.feed) { feedViewPost ->
+                            // Posts section
+                            feed?.feed?.let { posts ->
+                                items(posts) { feedViewPost ->
                                     PostItem(
                                         feedItem = feedViewPost,
                                         onAuthorClick = { authorDid ->
                                             navigator?.push(ProfileScreen(authorDid))
                                         },
-                                        onLikeClick = { post, isLiking ->
-                                            // Fixed unlike action
-                                            coroutineScope.launch {
-                                                try {
-                                                    if (isLiking) {
-                                                        // Like the post
-                                                        blueskyApi.likePost(post.uri, post.cid)
-                                                    } else {
-                                                        // Unlike the post
-                                                        post.viewer?.like?.let { likeUri ->
-                                                            blueskyApi.unlikePost(likeUri)
-                                                        }
-                                                    }
-                                                } catch (e: Exception) {
-                                                    snackbarHostState.showSnackbar(
-                                                        if (isLiking) "Falha ao curtir: ${e.message}"
-                                                        else "Falha ao remover curtida: ${e.message}"
+                                        onLikeClick = { post, isLiking, onUpdate ->
+                                            PostInteractionHandler.handleLikeAction(
+                                                post = post,
+                                                isLiking = isLiking,
+                                                api = blueskyApi,
+                                                scope = coroutineScope,
+                                                snackbarHostState = snackbarHostState,
+                                                showDialog = showDialog,
+                                                onActionComplete = { updatedPost ->
+                                                    onUpdate(updatedPost)
+                                                    feed = feed?.copy(
+                                                        feed = feed?.feed?.map { feedItem ->
+                                                            if (feedItem.post.uri == updatedPost.uri) {
+                                                                feedItem.copy(post = updatedPost)
+                                                            } else {
+                                                                feedItem
+                                                            }
+                                                        } ?: listOf()
                                                     )
                                                 }
-                                            }
+                                            )
                                         },
-                                        onParentClick = { postUri ->
-                                            navigator?.push(ThreadScreen(postUri))
+                                        onRepostClick = { post, isReposting, onUpdate ->
+                                            PostInteractionHandler.handleRepostAction(
+                                                post = post,
+                                                isReposting = isReposting,
+                                                api = blueskyApi,
+                                                scope = coroutineScope,
+                                                snackbarHostState = snackbarHostState,
+                                                showDialog = showDialog,
+                                                onActionComplete = { updatedPost ->
+                                                    onUpdate(updatedPost)
+                                                    feed = feed?.copy(
+                                                        feed = feed?.feed?.map { feedItem ->
+                                                            if (feedItem.post.uri == updatedPost.uri) {
+                                                                feedItem.copy(post = updatedPost)
+                                                            } else {
+                                                                feedItem
+                                                            }
+                                                        } ?: listOf()
+                                                    )
+                                                }
+                                            )
+                                        },
+                                        onParentClick = { parentUri ->
+                                            navigator?.push(ThreadScreen(parentUri))
+                                        },
+                                        onTagClick = { tag ->
+                                            // Navega para SearchScreen com a tag como query inicial
+                                            navigator?.push(SearchScreenWithQuery("#$tag"))
+                                        },
+                                        onMentionClick = { did ->
+                                            navigator?.push(ProfileScreen(did))
+                                        },
+                                        onLinkClick = { uri ->
+                                            // Handle link click if needed
                                         },
                                         showConfirmationDialog = showDialog
                                     )
                                 }
                             }
 
-                            // Indicador de carregamento no final da lista
                             item {
-                                if (feed?.cursor != null && isLoading) {
+                                if (isLoading && feed != null) {
                                     LoadingIndicator()
                                 }
                             }
                         }
 
-                        // Handler para carregamento infinito
+                        // InfiniteScrollHandler
                         InfiniteScrollHandler(
                             listState = lazyListState,
                             loading = isLoading,
                             onLoadMore = {
-                                if (feed?.cursor != null && actor != null) {
+                                if (feed?.cursor != null) {
                                     coroutineScope.launch {
                                         if (!validateAuthentication(authService, navigator)) {
                                             return@launch
@@ -355,18 +445,18 @@ class ProfileScreen(
 
                                         isLoading = true
                                         try {
-                                            val nextPage = blueskyApi.getAuthorFeed(
-                                                actor = actor!!.did,
-                                                cursor = feed?.cursor
-                                            )
-                                            feed = Feed(
-                                                feed = feed!!.feed + nextPage.feed,
-                                                cursor = nextPage.cursor
-                                            )
+                                            actor?.did?.let { actorDid ->
+                                                val nextPage = blueskyApi.getAuthorFeed(
+                                                    actor = actorDid,
+                                                    cursor = feed?.cursor
+                                                )
+                                                feed = feed?.copy(
+                                                    feed = feed?.feed.orEmpty() + nextPage.feed,
+                                                    cursor = nextPage.cursor
+                                                )
+                                            }
                                         } catch (e: Exception) {
-                                            snackbarHostState.showSnackbar(
-                                                "Falha ao carregar mais posts: ${e.message}"
-                                            )
+                                            snackbarHostState.showSnackbar("Erro ao carregar mais posts: ${e.message}")
                                         } finally {
                                             isLoading = false
                                         }
@@ -423,7 +513,7 @@ private suspend fun loadProfileData(
         onActorLoaded(actor)
 
         try {
-            val userFeed = blueskyApi.getAuthorFeed(actor.did)
+            val userFeed = blueskyApi.getAuthorFeed(actor = actor.did)
             onFeedLoaded(userFeed)
         } catch (e: Exception) {
             onError("Erro ao carregar feed: ${e.message}")

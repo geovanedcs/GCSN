@@ -54,6 +54,8 @@ import br.com.omnidevs.gcsn.util.AppDependencies
 import br.com.omnidevs.gcsn.util.AuthService
 import br.com.omnidevs.gcsn.util.AuthState
 import br.com.omnidevs.gcsn.util.AuthStateManager
+import br.com.omnidevs.gcsn.util.PostInteractionHandler
+import br.com.omnidevs.gcsn.util.SearchScreenWithQuery
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
@@ -102,12 +104,8 @@ class DiscoverScreen : Screen {
             }
 
             try {
-                // Usar uma feed de descoberta diferente da timeline padrão
-                val discoverFeed = blueskyApi.getFeed(
-                    feed = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
-                    limit = 20
-                )
-                feed = discoverFeed
+                val cosplayFeed = blueskyApi.searchCosplayContent(limit = 20)
+                feed = cosplayFeed
                 error = null
             } catch (e: Exception) {
                 error = e.message ?: "Erro desconhecido"
@@ -122,7 +120,7 @@ class DiscoverScreen : Screen {
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
-                    title = { Text("Descobrir") },
+                    title = { Text("Descobrir Cosplays") },
                     actions = {
                         IconButton(onClick = {
                             coroutineScope.launch {
@@ -133,11 +131,8 @@ class DiscoverScreen : Screen {
                                 isLoading = true
                                 error = null
                                 try {
-                                    val discoverFeed = blueskyApi.getFeed(
-                                        feed = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
-                                        limit = 20
-                                    )
-                                    feed = discoverFeed
+                                    val cosplayFeed = blueskyApi.searchCosplayContent(limit = 20)
+                                    feed = cosplayFeed
                                 } catch (e: Exception) {
                                     error = e.message ?: "Erro desconhecido"
                                 } finally {
@@ -195,18 +190,12 @@ class DiscoverScreen : Screen {
                             Spacer(Modifier.height(8.dp))
                             Button(onClick = {
                                 coroutineScope.launch {
-                                    if (!validateAuthentication(authService, navigator)) {
-                                        return@launch
-                                    }
-
                                     isLoading = true
                                     error = null
                                     try {
-                                        val discoverFeed = blueskyApi.getFeed(
-                                            feed = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
-                                            limit = 20
-                                        )
-                                        feed = discoverFeed
+                                        val cosplayFeed =
+                                            blueskyApi.searchCosplayContent(limit = 20)
+                                        feed = cosplayFeed
                                     } catch (e: Exception) {
                                         error = e.message ?: "Erro desconhecido"
                                     } finally {
@@ -230,37 +219,73 @@ class DiscoverScreen : Screen {
                                     onAuthorClick = { authorDid ->
                                         navigator?.push(ProfileScreen(authorDid))
                                     },
-                                    onLikeClick = { post, isLiking ->
-                                        // Fixed like/unlike action
-                                        coroutineScope.launch {
-                                            try {
-                                                if (isLiking) {
-                                                    // Like the post
-                                                    blueskyApi.likePost(post.uri, post.cid)
-                                                } else {
-                                                    // Unlike the post - fix was needed here
-                                                    post.viewer?.like?.let { likeUri ->
-                                                        blueskyApi.unlikePost(likeUri)
-                                                    }
-                                                }
-                                            } catch (e: Exception) {
-                                                snackbarHostState.showSnackbar(
-                                                    if (isLiking) "Falha ao curtir: ${e.message}"
-                                                    else "Falha ao remover curtida: ${e.message}"
+                                    onLikeClick = { post, isLiking, onUpdate ->
+                                        PostInteractionHandler.handleLikeAction(
+                                            post = post,
+                                            isLiking = isLiking,
+                                            api = blueskyApi,
+                                            scope = coroutineScope,
+                                            snackbarHostState = snackbarHostState,
+                                            showDialog = showDialog,
+                                            onActionComplete = { updatedPost ->
+                                                // Update local UI state immediately
+                                                onUpdate(updatedPost)
+
+                                                // Update feed state
+                                                feed = feed?.copy(
+                                                    feed = feed?.feed?.map { feedItem ->
+                                                        if (feedItem.post.uri == updatedPost.uri) {
+                                                            feedItem.copy(post = updatedPost)
+                                                        } else {
+                                                            feedItem
+                                                        }
+                                                    } ?: listOf()
                                                 )
                                             }
-                                        }
+                                        )
                                     },
-                                    onParentClick = { postUri ->
-                                        navigator?.push(ThreadScreen(postUri))
+                                    onRepostClick = { post, isReposting, onUpdate ->
+                                        PostInteractionHandler.handleRepostAction(
+                                            post = post,
+                                            isReposting = isReposting,
+                                            api = blueskyApi,
+                                            scope = coroutineScope,
+                                            snackbarHostState = snackbarHostState,
+                                            showDialog = showDialog,
+                                            onActionComplete = { updatedPost ->
+                                                // Update local UI state immediately
+                                                onUpdate(updatedPost)
+
+                                                // Update feed state
+                                                feed = feed?.copy(
+                                                    feed = feed?.feed?.map { feedItem ->
+                                                        if (feedItem.post.uri == updatedPost.uri) {
+                                                            feedItem.copy(post = updatedPost)
+                                                        } else {
+                                                            feedItem
+                                                        }
+                                                    } ?: listOf()
+                                                )
+                                            }
+                                        )
                                     },
+                                    onParentClick = { parentUri ->
+                                        navigator?.push(ThreadScreen(parentUri))
+                                    },
+                                    onTagClick = { tag ->
+                                        navigator?.push(SearchScreenWithQuery("#$tag"))
+                                    },
+                                    onMentionClick = { did ->
+                                        navigator?.push(ProfileScreen(did))
+                                    },
+                                    onLinkClick = { uri -> },
                                     showConfirmationDialog = showDialog
                                 )
                             }
 
                             // Indicador de carregamento no final da lista
                             item {
-                                if (feed?.cursor != null && isLoading) {
+                                if (isLoading && feed != null) {
                                     LoadingIndicator()
                                 }
                             }
@@ -279,19 +304,16 @@ class DiscoverScreen : Screen {
 
                                         isLoading = true
                                         try {
-                                            val nextPage = blueskyApi.getFeed(
-                                                feed = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
+                                            val nextPage = blueskyApi.searchCosplayContent(
                                                 limit = 20,
                                                 cursor = feed?.cursor
                                             )
-                                            feed = Feed(
-                                                feed = feed!!.feed + nextPage.feed,
+                                            feed = feed?.copy(
+                                                feed = feed?.feed.orEmpty() + nextPage.feed,
                                                 cursor = nextPage.cursor
                                             )
                                         } catch (e: Exception) {
-                                            snackbarHostState.showSnackbar(
-                                                "Falha ao carregar mais posts: ${e.message}"
-                                            )
+                                            snackbarHostState.showSnackbar("Erro ao carregar mais posts: ${e.message}")
                                         } finally {
                                             isLoading = false
                                         }

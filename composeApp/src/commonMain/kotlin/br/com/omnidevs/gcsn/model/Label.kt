@@ -13,6 +13,7 @@ data class Label(
     val neg: Boolean? = null,
     val src: String? = null,
     val cts: String? = null,
+    val ver: Int? = null,
 )
 
 @Serializable

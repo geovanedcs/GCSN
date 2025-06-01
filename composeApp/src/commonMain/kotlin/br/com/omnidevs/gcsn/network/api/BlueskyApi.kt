@@ -5,20 +5,28 @@ import EmbedRequest
 import ImageDetailRequest
 import LinkRef
 import br.com.omnidevs.gcsn.model.Feed
+import br.com.omnidevs.gcsn.model.FeedItem
 import br.com.omnidevs.gcsn.model.ImageFile
 import br.com.omnidevs.gcsn.model.Label
 import br.com.omnidevs.gcsn.model.LabelObject
+import br.com.omnidevs.gcsn.model.SearchPosts
 import br.com.omnidevs.gcsn.model.actor.Actor
+import br.com.omnidevs.gcsn.model.actor.SearchActorsResponse
 import br.com.omnidevs.gcsn.model.post.CreatePostRequest
 import br.com.omnidevs.gcsn.model.post.PostRef
 import br.com.omnidevs.gcsn.model.post.RecordRequest
+import br.com.omnidevs.gcsn.model.post.ReplyRef
 import br.com.omnidevs.gcsn.model.post.RequestLabels
 import br.com.omnidevs.gcsn.model.post.embed.BlobResponse
 import br.com.omnidevs.gcsn.model.post.interactions.CreateRecordResponse
+import br.com.omnidevs.gcsn.model.post.interactions.CreateRepostRequest
+import br.com.omnidevs.gcsn.model.post.interactions.DeleteRepostRequest
 import br.com.omnidevs.gcsn.model.post.interactions.FollowRecord
 import br.com.omnidevs.gcsn.model.post.interactions.FollowRequest
 import br.com.omnidevs.gcsn.model.post.interactions.LikeRecord
 import br.com.omnidevs.gcsn.model.post.interactions.LikeRequest
+import br.com.omnidevs.gcsn.model.post.interactions.RepostRecord
+import br.com.omnidevs.gcsn.model.post.interactions.RepostSubject
 import br.com.omnidevs.gcsn.model.post.interactions.SubjectRef
 import br.com.omnidevs.gcsn.model.post.interactions.ThreadViewPost
 import br.com.omnidevs.gcsn.model.post.interactions.UnfollowRequest
@@ -93,7 +101,8 @@ class BlueskyApi {
         return Pair(response.body<BlobResponse>(), determinedMimeType)
     }
 
-    suspend fun createPost(text: String, images: List<ImageFile>): PostRef {
+    suspend fun createPost(text: String, images: List<ImageFile>,
+                           reply: ReplyRef? = null): PostRef {
         // Processar as imagens, se houver
         val embed = if (images.isNotEmpty()) {
             val imageDetailRequests = images.mapNotNull { imageFile ->
@@ -136,16 +145,9 @@ class BlueskyApi {
                 createdAt = timestamp,
                 embed = embed,
                 facets = null,
-                reply = null,
+                reply = reply,
                 langs = emptyList(),
                 tags = null,
-                labels = RequestLabels(
-                    type = "com.atproto.label.defs#selfLabels",
-                    values = listOf(
-                        Label(value = "gcsn"),
-                        Label(value = "cosplay")
-                    )
-                )
             )
         )
         val jsonString = Json.encodeToString(CreatePostRequest.serializer(), createPostRequest)
@@ -261,6 +263,112 @@ class BlueskyApi {
         }.body()
     }
 
+    suspend fun repostPost(postUri: String, cid: String): PostRef {
+        val did = AppDependencies.authService.getUserData()?.did
+            ?: throw IllegalStateException("Usuário não autenticado. Por favor, faça login.")
+
+        val timestamp = Clock.System.now().toString()
+
+        val repostRequest = CreateRepostRequest(
+            repo = did,
+            collection = "app.bsky.feed.repost",
+            record = RepostRecord(
+                type = "app.bsky.feed.repost",
+                subject = RepostSubject(uri = postUri, cid = cid),
+                createdAt = timestamp
+            )
+        )
+
+        return client.post("https://bsky.social/xrpc/com.atproto.repo.createRecord") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(repostRequest)
+        }.body()
+    }
+
+    suspend fun deleteRepost(repostUri: String): Boolean {
+        val did = AppDependencies.authService.getUserData()?.did
+            ?: throw IllegalStateException("Usuário não autenticado. Por favor, faça login.")
+
+        val deleteRepostRequest = DeleteRepostRequest(
+            repo = did,
+            collection = "app.bsky.feed.repost",
+            rkey = extractRkeyFromUri(repostUri)
+        )
+
+        val response = client.post("https://bsky.social/xrpc/com.atproto.repo.deleteRecord") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(deleteRepostRequest)
+        }
+
+        return response.status.value == 200
+    }
+
+  suspend fun searchCosplayContent(limit: Int = 50, cursor: String? = null): Feed {
+      try {
+          // Start with a basic search to ensure we get results
+          val searchResults = client.get("https://bsky.social/xrpc/app.bsky.feed.searchPosts") {
+              // Use a simpler query first
+              url.parameters.append("q", "cosplay OR #cosplay")
+              url.parameters.append("limit", limit.toString())
+              cursor?.let { url.parameters.append("cursor", it) }
+          }.body<SearchPosts>()
+
+          // Get original posts from the search
+          val posts = searchResults.posts ?: emptyList()
+
+          // Filter out NSFW content programmatically
+          val filteredPosts = posts.filter { post ->
+              val text = post.record?.text?.lowercase() ?: ""
+              !text.contains("nsfw") && !text.contains("hentai") &&
+              !text.contains("porn") && !text.contains("adult") &&
+              !text.contains("xxx") && !text.contains("18+") &&
+              !text.contains("ecchi")
+          }
+
+          return Feed(
+              feed = filteredPosts.map { post ->
+                  FeedItem(post = post, reply = null, reason = null)
+              },
+              cursor = searchResults.cursor
+          )
+      } catch (e: Exception) {
+          // Fallback to timeline if search fails
+          return try {
+              client.get("https://bsky.social/xrpc/app.bsky.feed.getTimeline") {
+                  url.parameters.append("limit", limit.toString())
+              }.body<Feed>()
+          } catch (_: Exception) {
+              Feed(feed = emptyList(), cursor = null)
+          }
+      }
+  }
+
+    suspend fun searchActors(query: String, limit: Int = 20, cursor: String? = null): SearchActorsResponse {
+        return client.get("https://bsky.social/xrpc/app.bsky.actor.searchActors") {
+            url.parameters.append("term", query)
+            url.parameters.append("limit", limit.toString())
+            cursor?.let { url.parameters.append("cursor", it) }
+        }.body()
+    }
+
+    // Search for posts (including hashtags)
+    suspend fun searchPosts(query: String, limit: Int = 20, cursor: String? = null): SearchPosts {
+        return client.get("https://bsky.social/xrpc/app.bsky.feed.searchPosts") {
+            url.parameters.append("q", query)
+            url.parameters.append("limit", limit.toString())
+            cursor?.let { url.parameters.append("cursor", it) }
+        }.body()
+    }
+
+    // Helper function to convert SearchPosts to Feed format
+    fun convertSearchPostsToFeed(searchPosts: SearchPosts): Feed {
+        return Feed(
+            feed = searchPosts.posts?.map { post ->
+                FeedItem(post = post, reply = null, reason = null)
+            } ?: emptyList(),
+            cursor = searchPosts.cursor
+        )
+    }
 //    suspend fun getNotifications(limit: Int = 20, cursor: String? = null): NotificationResponse {
 //        return client.get("xrpc/app.bsky.notification.list") {
 //            url.parameters.append("limit", limit.toString())
@@ -268,12 +376,6 @@ class BlueskyApi {
 //        }.body()
 //    }
 //
-//    suspend fun searchActors(query: String, limit: Int = 20): SearchActorsResponse {
-//        return client.get("xrpc/app.bsky.actor.searchActors") {
-//            url.parameters.append("query", query)
-//            url.parameters.append("limit", limit.toString())
-//        }.body()
-//    }
 //
 //    suspend fun registerAccount(
 //        email: String,

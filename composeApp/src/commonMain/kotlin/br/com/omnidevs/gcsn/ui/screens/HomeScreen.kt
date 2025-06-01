@@ -1,59 +1,23 @@
 package br.com.omnidevs.gcsn.ui.screens
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
 import br.com.omnidevs.gcsn.network.api.BlueskyApi
-import br.com.omnidevs.gcsn.ui.components.CommonBottomBar
-import br.com.omnidevs.gcsn.ui.components.CommonFAB
-import br.com.omnidevs.gcsn.ui.components.ConfirmationDialog
-import br.com.omnidevs.gcsn.ui.components.ConfirmationDialogType
-import br.com.omnidevs.gcsn.ui.components.InfiniteScrollHandler
-import br.com.omnidevs.gcsn.ui.components.LoadingIndicator
-import br.com.omnidevs.gcsn.ui.components.PostItem
+import br.com.omnidevs.gcsn.ui.components.*
 import br.com.omnidevs.gcsn.ui.navigation.TabItem
-import br.com.omnidevs.gcsn.util.AppDependencies
-import br.com.omnidevs.gcsn.util.AuthService
-import br.com.omnidevs.gcsn.util.AuthState
-import br.com.omnidevs.gcsn.util.AuthStateManager
+import br.com.omnidevs.gcsn.util.*
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
@@ -97,11 +61,9 @@ class HomeScreen : Screen {
         val bottomBarState = remember { derivedStateOf { scrollBehavior.state.heightOffset == 0f } }
 
         LaunchedEffect(Unit) {
-            // Validar autenticação antes de carregar o feed
             if (!validateAuthentication(authService, navigator)) {
                 return@LaunchedEffect
             }
-
             loadFeed(blueskyApi, onSuccess = { feed = it }, onError = { error = it })
             isLoading = false
         }
@@ -116,11 +78,9 @@ class HomeScreen : Screen {
                     actions = {
                         IconButton(onClick = {
                             coroutineScope.launch {
-                                // Validar autenticação antes de recarregar o feed
                                 if (!validateAuthentication(authService, navigator)) {
                                     return@launch
                                 }
-
                                 isLoading = true
                                 error = null
                                 loadFeed(
@@ -181,10 +141,6 @@ class HomeScreen : Screen {
                             Spacer(Modifier.height(8.dp))
                             Button(onClick = {
                                 coroutineScope.launch {
-                                    if (!validateAuthentication(authService, navigator)) {
-                                        return@launch
-                                    }
-
                                     isLoading = true
                                     error = null
                                     loadFeed(
@@ -211,43 +167,71 @@ class HomeScreen : Screen {
                                     onAuthorClick = { authorDid ->
                                         navigator?.push(ProfileScreen(authorDid))
                                     },
-                                    onLikeClick = { post, isLiking ->
-                                        // Fixed the like/unlike action
-                                        coroutineScope.launch {
-                                            try {
-                                                if (isLiking) {
-                                                    // Like the post
-                                                    blueskyApi.likePost(post.uri, post.cid)
-                                                } else {
-                                                    // Unlike the post - fix was needed here
-                                                    post.viewer?.like?.let { likeUri ->
-                                                        blueskyApi.unlikePost(likeUri)
-                                                    }
-                                                }
-                                            } catch (e: Exception) {
-                                                snackbarHostState.showSnackbar(
-                                                    if (isLiking) "Falha ao curtir: ${e.message}"
-                                                    else "Falha ao remover curtida: ${e.message}"
+                                    onLikeClick = { post, isLiking, onUpdate ->
+                                        PostInteractionHandler.handleLikeAction(
+                                            post = post,
+                                            isLiking = isLiking,
+                                            api = blueskyApi,
+                                            scope = coroutineScope,
+                                            snackbarHostState = snackbarHostState,
+                                            showDialog = showDialog,
+                                            onActionComplete = { updatedPost ->
+                                                onUpdate(updatedPost)
+                                                feed = feed?.copy(
+                                                    feed = feed?.feed?.map { feedItem ->
+                                                        if (feedItem.post.uri == updatedPost.uri) {
+                                                            feedItem.copy(post = updatedPost)
+                                                        } else {
+                                                            feedItem
+                                                        }
+                                                    } ?: listOf()
                                                 )
                                             }
-                                        }
+                                        )
                                     },
-                                    onParentClick = { postUri ->
-                                        navigator?.push(ThreadScreen(postUri))
+                                    onRepostClick = { post, isReposting, onUpdate ->
+                                        PostInteractionHandler.handleRepostAction(
+                                            post = post,
+                                            isReposting = isReposting,
+                                            api = blueskyApi,
+                                            scope = coroutineScope,
+                                            snackbarHostState = snackbarHostState,
+                                            showDialog = showDialog,
+                                            onActionComplete = { updatedPost ->
+                                                onUpdate(updatedPost)
+                                                feed = feed?.copy(
+                                                    feed = feed?.feed?.map { feedItem ->
+                                                        if (feedItem.post.uri == updatedPost.uri) {
+                                                            feedItem.copy(post = updatedPost)
+                                                        } else {
+                                                            feedItem
+                                                        }
+                                                    } ?: listOf()
+                                                )
+                                            }
+                                        )
                                     },
+                                    onParentClick = { parentUri ->
+                                        navigator?.push(ThreadScreen(parentUri))
+                                    },
+                                    onTagClick = { tag ->
+                                        navigator?.push(SearchScreenWithQuery("#$tag"))
+                                    },
+                                    onMentionClick = { did ->
+                                        navigator?.push(ProfileScreen(did))
+                                    },
+                                    onLinkClick = { uri -> },
                                     showConfirmationDialog = showDialog
                                 )
                             }
 
-                            // Indicador de carregamento no final da lista
                             item {
-                                if (feed?.cursor != null && isLoading) {
+                                if (isLoading && feed != null) {
                                     LoadingIndicator()
                                 }
                             }
                         }
 
-                        // Handler para carregamento infinito
                         InfiniteScrollHandler(
                             listState = listState,
                             loading = isLoading,
@@ -257,18 +241,16 @@ class HomeScreen : Screen {
                                         if (!validateAuthentication(authService, navigator)) {
                                             return@launch
                                         }
-
                                         isLoading = true
                                         try {
-                                            val nextPage = blueskyApi.getTimeline(cursor = feed?.cursor)
-                                            feed = Feed(
-                                                feed = feed!!.feed + nextPage.feed,
+                                            val nextPage =
+                                                blueskyApi.getTimeline(cursor = feed?.cursor)
+                                            feed = feed?.copy(
+                                                feed = feed?.feed.orEmpty() + nextPage.feed,
                                                 cursor = nextPage.cursor
                                             )
                                         } catch (e: Exception) {
-                                            snackbarHostState.showSnackbar(
-                                                "Falha ao carregar mais posts: ${e.message}"
-                                            )
+                                            snackbarHostState.showSnackbar("Erro ao carregar mais posts: ${e.message}")
                                         } finally {
                                             isLoading = false
                                         }
@@ -279,7 +261,6 @@ class HomeScreen : Screen {
                     }
                 }
 
-                // Display the confirmation dialog when needed
                 if (showConfirmationDialog) {
                     ConfirmationDialog(
                         title = dialogTitle,
@@ -297,7 +278,6 @@ class HomeScreen : Screen {
         }
     }
 
-    // Função para validar autenticação
     private suspend fun validateAuthentication(
         authService: AuthService,
         navigator: Navigator?
@@ -320,10 +300,8 @@ class HomeScreen : Screen {
             val feed = api.getTimeline()
             onSuccess(feed)
         } catch (e: Exception) {
-            // Verifica se o erro é relacionado à autenticação
             if (e.message?.contains("unauthorized", ignoreCase = true) == true) {
                 AuthStateManager.setAuthState(AuthState.LOGGED_OUT)
-                // O redirecionamento será tratado na próxima chamada a validateAuthentication
             }
             onError(e.message ?: "Erro desconhecido")
         }

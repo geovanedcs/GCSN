@@ -13,105 +13,89 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 @Serializable
 @JsonClassDiscriminator("\$type")
 sealed class Embed {
-
     // Image embeds
     @Serializable
     @SerialName("app.bsky.embed.images")
-    data class Image(val images: List<ImageDetail>?) : Embed()
+    data class Images(val images: List<ImageDetail>) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.images#view")
-    data class ImagesView(
-        val images: List<ImageView>
-    ) : Embed()
+    data class ImagesView(val images: List<ImageView>) : Embed()
 
     // External embeds
     @Serializable
     @SerialName("app.bsky.embed.external")
-    data class External(val external: ExternalEmbed?) : Embed()
+    data class External(val external: ExternalEmbed) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.external#view")
-    data class ExternalView(
-        val external: ExternalViewDetails
-    ) : Embed()
+    data class ExternalView(val external: ExternalViewEmbed) : Embed()
 
     // Video embeds
     @Serializable
     @SerialName("app.bsky.embed.video")
-    data class Video(val aspectRatio: AspectRatio?, val video: VideoBlob?) : Embed()
+    data class Video(val aspectRatio: AspectRatio, val video: Blob) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.video#view")
     data class VideoView(
-        val cid: String?,
-        val playlist: String?,
-        val thumbnail: String?,
-        val aspectRatio: AspectRatio?
+        val cid: String, val playlist: String, val thumbnail: String, val aspectRatio: AspectRatio
     ) : Embed()
 
     // Record embeds
     @Serializable
     @SerialName("app.bsky.embed.record")
-    data class RecordWithRecord(val record: RecordEmbed?) : Embed()
+    data class Record(val record: EmbedRecord) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.record#view")
-    data class RecordView(
-        val record: ViewRecord
-    ) : Embed()
+    data class RecordView(val record: ViewRecord) : Embed()
 
+    // Record with Media embeds
     @Serializable
     @SerialName("app.bsky.embed.recordWithMedia")
-    data class RecordWithMedia(val record: RecordWithRecord?, val media: Embed?) : Embed()
+    data class RecordWithMedia(val record: EmbedRecord, val media: Embed) : Embed()
 
     @Serializable
     @SerialName("app.bsky.embed.recordWithMedia#view")
-    data class RecordWithMediaView(
-        val record: RecordViewWrapper,
-        val media: Embed?
-    ) : Embed()
+    data class RecordWithMediaView(val record: RecordView, val media: Embed) : Embed()
+}
 
-    @Serializable
-    data class ImageView(
-        val thumb: String? = null,
-        val fullsize: String? = null,
-        val alt: String? = null,
-        val aspectRatio: AspectRatio? = null,
-    )
+@Serializable
+data class AspectRatio(
+    val width: Int, val height: Int
+)
 
-    @Serializable
-    data class ExternalViewDetails(
-        val uri: String,
-        val title: String,
-        val description: String,
-        val thumb: String? = null
-    )
+@Serializable
+data class ImageView(
+    val thumb: String,
+    val fullsize: String,
+    val alt: String? = null,
+    val aspectRatio: AspectRatio? = null
+)
 
-    @Serializable
-    data class RecordEmbed(
-        val cid: String,
-        val uri: String
-    )
+@Serializable
+data class ExternalViewEmbed(
+    val uri: String, val title: String, val description: String, val thumb: String? = null
+)
 
-    @Serializable
-    data class RecordViewWrapper(
-        val record: RecordViewRecord
-    )
+@Serializable
+data class EmbedRecord(
+    val cid: String, val uri: String
+)
 
-    @OptIn(ExperimentalSerializationApi::class)
-    @Serializable
-    @JsonClassDiscriminator("\$type")
-    sealed class ViewRecord
-
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+@JsonClassDiscriminator("\$type")
+sealed class ViewRecord {
     @Serializable
     @SerialName("app.bsky.embed.record#viewRecord")
-    data class RecordViewRecord(
+    data class ViewNormal(
         val uri: String,
         val cid: String,
         val author: Author,
-        val value: RecordValue?,
-        val labels: List<Label> = emptyList(),
+        val value: RecordValue? = null,
+        val labels: List<Label>? = null,
         val embeds: List<Embed>? = null,
         val indexedAt: String,
         val likeCount: Int = 0,
@@ -123,78 +107,38 @@ sealed class Embed {
     @Serializable
     @SerialName("app.bsky.embed.record#viewBlocked")
     data class ViewBlocked(
-        val uri: String,
-        val blocked: Boolean = true,
-        val author: BlockedAuthor
+        val uri: String, val blocked: Boolean = true, val author: BlockedAuthor
     ) : ViewRecord()
 
     @Serializable
     @SerialName("app.bsky.embed.record#viewNotFound")
     data class ViewNotFound(
-        val uri: String,
-        val notFound: Boolean = true
+        val uri: String, val notFound: Boolean = true
     ) : ViewRecord()
-
-    @Serializable
-    data class BlockedAuthor(
-        val did: String,
-        val viewer: AuthorBlockedViewer? = null
-    )
-
-    @Serializable
-    data class AuthorBlockedViewer(
-        val blockedBy: Boolean = false
-    )
-
-    // Record value class
-    @Serializable
-    data class RecordValue(
-        @SerialName("\$type")
-        val type: String,
-        val text: String? = null,
-        val createdAt: String,
-        val embed: Embed? = null,
-        val langs: List<String>? = null,
-        val facets: List<Facet>? = null,
-        val reply: ReplyRef? = null,
-        val labels: List<Label>? = null
-    )
-
-    @Serializable
-    data class ExternalEmbed(
-        val uri: String,
-        val title: String,
-        val description: String,
-        val thumb: BlobImage? = null
-    )
-
-    @Serializable
-    data class BlobImage(
-        @SerialName("\$type") val type: String = "blob",
-        val ref: BlobRef,
-        val mimeType: String,
-        val size: Long
-    )
-
-    @Serializable
-    data class BlobRef(
-        @SerialName("\$link") val link: String
-    )
-
-    @Serializable
-    data class ExternalEmbedView(
-        val uri: String, // The URL
-        val title: String,
-        val description: String,
-        val thumb: String?
-    )
-
-    @Serializable
-    data class VideoBlob(
-        @SerialName("\$type") val type: String = "blob",
-        val ref: BlobRef,
-        val mimeType: String,
-        val size: Long
-    )
-
 }
+
+@Serializable
+data class BlockedAuthor(
+    val did: String, val viewer: AuthorBlockedViewer? = null
+)
+
+@Serializable
+data class AuthorBlockedViewer(
+    val blockedBy: Boolean = false
+)
+
+@Serializable
+data class RecordValue(
+    @SerialName("\$type") val type: String,
+    val text: String? = null,
+    val createdAt: String,
+    val embed: Embed? = null,
+    val langs: List<String>? = null,
+    val facets: List<Facet>? = null,
+    val reply: ReplyRef? = null
+)
+
+@Serializable
+data class ExternalEmbed(
+    val uri: String, val title: String, val description: String, val thumb: Blob? = null
+)

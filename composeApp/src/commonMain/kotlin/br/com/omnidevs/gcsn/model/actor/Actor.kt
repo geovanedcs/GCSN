@@ -1,5 +1,6 @@
 package br.com.omnidevs.gcsn.model.actor
 
+import br.com.omnidevs.gcsn.model.Label
 import br.com.omnidevs.gcsn.model.post.Viewer
 import kotlinx.serialization.Serializable
 
@@ -11,7 +12,7 @@ data class Actor(
     val avatar: String? = null,
     val associated: Associated,
     val viewer: Viewer,
-    val labels: List<String> = emptyList(),
+    val labels: List<Label> = emptyList(),
     val createdAt: String,
     val description: String? = null,
     val indexedAt: String,
@@ -19,4 +20,10 @@ data class Actor(
     val followersCount: Int = 0,
     val followsCount: Int = 0,
     val postsCount: Int = 0
+)
+
+@Serializable
+data class SearchActorsResponse(
+    val actors: List<Actor>,
+    val cursor: String? = null
 )

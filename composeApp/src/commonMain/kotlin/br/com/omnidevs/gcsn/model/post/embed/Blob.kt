@@ -13,3 +13,8 @@ data class Blob(
     val mimeType: String,
     val size: Long
 )
+
+@Serializable
+data class Link(
+    @SerialName("\$link") val link: String
+)
