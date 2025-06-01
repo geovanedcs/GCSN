@@ -13,6 +13,21 @@ data class Author(
     val viewer: AuthorViewer? = null,
     val labels: List<Label> = emptyList(),
     val associated: Associated? = null,
+    val verification: Verification? = null,
     val createdAt: String
 )
 
+@Serializable
+data class Verification(
+    val verifications: List<VerificationEntry> = emptyList(),
+    val verifiedStatus: String,
+    val trustedVerifierStatus: String
+)
+
+@Serializable
+data class VerificationEntry(
+    val issuer: String,
+    val uri: String,
+    val isValid: Boolean,
+    val createdAt: String
+)

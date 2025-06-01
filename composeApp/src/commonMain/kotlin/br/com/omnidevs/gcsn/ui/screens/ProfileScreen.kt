@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -43,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
@@ -85,9 +87,12 @@ class ProfileScreen(
         var feed by remember { mutableStateOf<Feed?>(null) }
         var isLoading by remember { mutableStateOf(true) }
         var isFollowLoading by remember { mutableStateOf(false) }
+        var isDeleting by remember { mutableStateOf(false) } // Add state for delete operations
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var currentTab by remember { mutableStateOf<TabItem>(TabItem.ProfileTab) }
         var isOwnProfile by remember { mutableStateOf(false) }
+
+        val blueskyApi = remember { BlueskyApi() }
 
         // Dialog state
         var showConfirmationDialog by remember { mutableStateOf(false) }
@@ -108,6 +113,28 @@ class ProfileScreen(
             showConfirmationDialog = true
         }
 
+        // Function to handle post deletion
+        val handleDeletePost = { postUri: String ->
+            coroutineScope.launch {
+                isDeleting = true
+                try {
+                    // Call API to delete post
+                    blueskyApi.deletePost(postUri)
+
+                    // Remove the post from the feed
+                    feed = feed?.copy(
+                        feed = feed?.feed?.filter { it.post.uri != postUri } ?: listOf()
+                    )
+
+                    snackbarHostState.showSnackbar("Publicação excluída com sucesso")
+                } catch (e: Exception) {
+                    snackbarHostState.showSnackbar("Falha ao excluir publicação: ${e.message}")
+                } finally {
+                    isDeleting = false
+                }
+            }
+        }
+
         // Estado para controlar a visibilidade do header
         val lazyListState = rememberLazyListState()
         val isHeaderVisible by remember {
@@ -116,7 +143,6 @@ class ProfileScreen(
             }
         }
 
-        val blueskyApi = remember { BlueskyApi() }
 
         // Add scroll behavior para TopAppBar e estados para animação
         val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -268,7 +294,7 @@ class ProfileScreen(
                                                             // IMPORTANT FIX: We need the follow URI, not just the DID
                                                             // Get the following URI from the viewer
                                                             val followingUri =
-                                                                currentActor.viewer?.following
+                                                                currentActor.viewer.following
 
                                                             if (followingUri != null) {
                                                                 println("Unfollowing user with URI: $followingUri")
@@ -281,11 +307,8 @@ class ProfileScreen(
                                                                 if (success) {
                                                                     // Update local state
                                                                     val updatedViewer =
-                                                                        currentActor.viewer?.copy(
+                                                                        currentActor.viewer.copy(
                                                                             following = null
-                                                                        ) ?: Viewer(
-                                                                            following = null,
-                                                                            followedBy = null
                                                                         )
 
                                                                     actor =
@@ -310,11 +333,8 @@ class ProfileScreen(
 
                                                             // Update local state with the new follow URI
                                                             val updatedViewer =
-                                                                currentActor.viewer?.copy(
+                                                                currentActor.viewer.copy(
                                                                     following = followUri
-                                                                ) ?: Viewer(
-                                                                    following = followUri,
-                                                                    followedBy = null
                                                                 )
 
                                                             actor =
@@ -420,7 +440,8 @@ class ProfileScreen(
                                         onLinkClick = { uri ->
                                             // Handle link click if needed
                                         },
-                                        showConfirmationDialog = showDialog
+                                        showConfirmationDialog = showDialog,
+                                        onDeleteClick = { postUri -> handleDeletePost(postUri) }
                                     )
                                 }
                             }
@@ -464,6 +485,18 @@ class ProfileScreen(
                                 }
                             }
                         )
+                    }
+                }
+
+                // Show loading overlay during deletion
+                if (isDeleting) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
                 }
 

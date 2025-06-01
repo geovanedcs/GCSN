@@ -7,8 +7,6 @@ import LinkRef
 import br.com.omnidevs.gcsn.model.Feed
 import br.com.omnidevs.gcsn.model.FeedItem
 import br.com.omnidevs.gcsn.model.ImageFile
-import br.com.omnidevs.gcsn.model.Label
-import br.com.omnidevs.gcsn.model.LabelObject
 import br.com.omnidevs.gcsn.model.SearchPosts
 import br.com.omnidevs.gcsn.model.actor.Actor
 import br.com.omnidevs.gcsn.model.actor.SearchActorsResponse
@@ -16,7 +14,6 @@ import br.com.omnidevs.gcsn.model.post.CreatePostRequest
 import br.com.omnidevs.gcsn.model.post.PostRef
 import br.com.omnidevs.gcsn.model.post.RecordRequest
 import br.com.omnidevs.gcsn.model.post.ReplyRef
-import br.com.omnidevs.gcsn.model.post.RequestLabels
 import br.com.omnidevs.gcsn.model.post.embed.BlobResponse
 import br.com.omnidevs.gcsn.model.post.interactions.CreateRecordResponse
 import br.com.omnidevs.gcsn.model.post.interactions.CreateRepostRequest
@@ -40,12 +37,10 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
-import kotlin.text.get
 
 class BlueskyApi {
 
@@ -61,18 +56,19 @@ class BlueskyApi {
         val response = client.get("https://bsky.social/xrpc/app.bsky.feed.getAuthorFeed") {
             url.parameters.append("actor", actor)
             url.parameters.append("limit", limit.toString())
-        }
-        return response.body()
-    }
-
-    suspend fun getFeed(feed: String, limit: Int = 20, cursor: String? = null): Feed {
-        val response = client.get("https://bsky.social/xrpc/app.bsky.feed.getFeed") {
-            url.parameters.append("feed", feed)
-            url.parameters.append("limit", limit.toString())
             cursor?.let { url.parameters.append("cursor", it) }
         }
         return response.body()
     }
+
+//    suspend fun getFeed(feed: String, limit: Int = 20, cursor: String? = null): Feed {
+//        val response = client.get("https://bsky.social/xrpc/app.bsky.feed.getFeed") {
+//            url.parameters.append("feed", feed)
+//            url.parameters.append("limit", limit.toString())
+//            cursor?.let { url.parameters.append("cursor", it) }
+//        }
+//        return response.body()
+//    }
 
     private suspend fun uploadBlob(imageUri: String, mimeType: String? = null): Pair<BlobResponse, String> {
         val authService = AppDependencies.authService
@@ -303,6 +299,24 @@ class BlueskyApi {
         return response.status.value == 200
     }
 
+    suspend fun deletePost(repostUri: String): Boolean {
+        val did = AppDependencies.authService.getUserData()?.did
+            ?: throw IllegalStateException("Usuário não autenticado. Por favor, faça login.")
+
+        val deleteRepostRequest = DeleteRepostRequest(
+            repo = did,
+            collection = "app.bsky.feed.post",
+            rkey = extractRkeyFromUri(repostUri)
+        )
+
+        val response = client.post("https://bsky.social/xrpc/com.atproto.repo.deleteRecord") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(deleteRepostRequest)
+        }
+
+        return response.status.value == 200
+    }
+
   suspend fun searchCosplayContent(limit: Int = 50, cursor: String? = null): Feed {
       try {
           // Start with a basic search to ensure we get results
@@ -318,7 +332,7 @@ class BlueskyApi {
 
           // Filter out NSFW content programmatically
           val filteredPosts = posts.filter { post ->
-              val text = post.record?.text?.lowercase() ?: ""
+              val text = post.record.text.lowercase()
               !text.contains("nsfw") && !text.contains("hentai") &&
               !text.contains("porn") && !text.contains("adult") &&
               !text.contains("xxx") && !text.contains("18+") &&
@@ -331,7 +345,7 @@ class BlueskyApi {
               },
               cursor = searchResults.cursor
           )
-      } catch (e: Exception) {
+      } catch (_: Exception) {
           // Fallback to timeline if search fails
           return try {
               client.get("https://bsky.social/xrpc/app.bsky.feed.getTimeline") {
@@ -410,10 +424,6 @@ class BlueskyApi {
 
         fun getCachedBytes(uri: String): ByteArray? {
             return imageByteCache[uri]
-        }
-
-        fun clearCache() {
-            imageByteCache.clear()
         }
     }
 }

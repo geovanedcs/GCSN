@@ -2,6 +2,7 @@ package br.com.omnidevs.gcsn.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +18,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,25 +36,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.omnidevs.gcsn.model.FeedItem
 import br.com.omnidevs.gcsn.model.RepostReason
 import br.com.omnidevs.gcsn.model.post.Facet
-import br.com.omnidevs.gcsn.model.post.FacetFeature
 import br.com.omnidevs.gcsn.model.post.LinkFeature
 import br.com.omnidevs.gcsn.model.post.MentionFeature
 import br.com.omnidevs.gcsn.model.post.PostOrBlockedPost.Post
 import br.com.omnidevs.gcsn.model.post.TagFeature
 import br.com.omnidevs.gcsn.model.post.embed.Embed
+import br.com.omnidevs.gcsn.util.AppDependencies
 import br.com.omnidevs.gcsn.util.DateUtils
 import coil3.compose.AsyncImage
 import gcsn.composeapp.generated.resources.Res
@@ -68,21 +71,22 @@ fun PostItem(
     onTagClick: (String) -> Unit = {},
     onMentionClick: (String) -> Unit = {},
     onLinkClick: (String) -> Unit = {},
-    showConfirmationDialog: ((String, String, String, ConfirmationDialogType, () -> Unit) -> Unit)? = null
+    showConfirmationDialog: ((String, String, String, ConfirmationDialogType, () -> Unit) -> Unit)? = null,
+    onDeleteClick: (postUri: String) -> Unit = {}
 ) {
     val post = feedItem.post
-    // Use state variables to track UI state locally with initial values from the post
     var isLiked by remember { mutableStateOf(post.viewer?.like != null) }
     var likeCount by remember { mutableIntStateOf(post.likeCount) }
     var isReposted by remember { mutableStateOf(post.viewer?.repost != null) }
     var repostCount by remember { mutableIntStateOf(post.repostCount) }
+    val currentUserDid = AppDependencies.authService.getUserData()?.did
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        // Display repost information if available
         if (feedItem.reason is RepostReason) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -104,7 +108,6 @@ fun PostItem(
             }
         }
 
-        // Display reply information if available
         feedItem.reply?.let { reply ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -133,7 +136,8 @@ fun PostItem(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clickable { onAuthorClick(post.author.did) }
-                .fillMaxWidth()) {
+                .fillMaxWidth()
+        ) {
             AsyncImage(
                 model = post.author.avatar ?: Res.getUri("drawable/avatar"),
                 contentDescription = "Avatar de ${post.author.displayName ?: post.author.handle}",
@@ -144,7 +148,7 @@ fun PostItem(
                 contentScale = ContentScale.Crop,
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = post.author.displayName ?: post.author.handle,
@@ -165,19 +169,25 @@ fun PostItem(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
+            if (post.author.did == currentUserDid) {
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Mais opções"
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
         if (post.record.text.isNotBlank()) {
             if (post.record.facets.isNullOrEmpty()) {
-                // Regular text without facets
                 Text(
                     text = post.record.text,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             } else {
-                // Text with facets (mentions, hashtags, links)
                 val annotatedText = createFacetText(
                     text = post.record.text,
                     facets = post.record.facets
@@ -196,12 +206,9 @@ fun PostItem(
         val viewEmbed = post.embed
         if (viewEmbed is Embed.ImagesView && viewEmbed.images.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Se tiver mais de uma imagem, usar o carrossel
             if (viewEmbed.images.size > 1) {
                 ImageCarousel(images = viewEmbed.images)
             } else {
-                // Para uma única imagem
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -217,11 +224,9 @@ fun PostItem(
                     )
                 }
             }
-
             Spacer(modifier = Modifier.height(8.dp))
         } else if (viewEmbed is Embed.ExternalView) {
             Spacer(modifier = Modifier.height(8.dp))
-
             ExternalLinkEmbed(
                 uri = viewEmbed.external.uri,
                 title = viewEmbed.external.title,
@@ -231,27 +236,25 @@ fun PostItem(
                     onLinkClick(viewEmbed.external.uri)
                 }
             )
-
             Spacer(modifier = Modifier.height(8.dp))
         } else if (viewEmbed != null) {
-        // Handle unknown or unsupported embed types
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 80.dp)
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Este recurso não está disponível no momento.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 80.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Este recurso não está disponível no momento.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
-        Spacer(modifier = Modifier.height(8.dp))
-    }
 
         Spacer(modifier = Modifier.height(8.dp))
         Row(
@@ -262,7 +265,7 @@ fun PostItem(
             PostAction(
                 icon = Icons.Filled.Reply,
                 count = post.replyCount,
-                contentDescription = "Replies",
+                contentDescription = "Respostas",
                 onClick = {
                     onParentClick(post.uri)
                 }
@@ -276,12 +279,8 @@ fun PostItem(
                 else
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 onClick = {
-                    // First determine if we're reposting or unreposting
                     val isReposting = !isReposted
-
-                    // Pass a callback to update this component's state after API action
                     onRepostClick(post, isReposting) { updatedPost ->
-                        // Update our local state with the API result
                         isReposted = updatedPost.viewer?.repost != null
                         repostCount = updatedPost.repostCount
                     }
@@ -290,18 +289,14 @@ fun PostItem(
             PostAction(
                 icon = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                 count = likeCount,
-                contentDescription = if (isLiked) "Unlike" else "Like",
+                contentDescription = if (isLiked) "Descurtir" else "Curtir",
                 tint = if (isLiked)
                     MaterialTheme.colorScheme.primary
                 else
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 onClick = {
-                    // First determine if we're liking or unliking
                     val isLiking = !isLiked
-
-                    // Pass a callback to update this component's state after API action
                     onLikeClick(post, isLiking) { updatedPost ->
-                        // Update our local state with the API result
                         isLiked = updatedPost.viewer?.like != null
                         likeCount = updatedPost.likeCount
                     }
@@ -309,6 +304,20 @@ fun PostItem(
             )
         }
         Spacer(modifier = Modifier.padding(vertical = 8.dp))
+    }
+
+    if (showDeleteDialog) {
+        ConfirmationDialog(
+            title = "Excluir publicação",
+            message = "Tem certeza que deseja excluir esta publicação?",
+            confirmButtonText = "Excluir",
+            onConfirm = {
+                onDeleteClick(post.uri)
+                showDeleteDialog = false
+            },
+            onDismiss = { showDeleteDialog = false },
+            type = ConfirmationDialogType.WARNING
+        )
     }
 }
 
@@ -346,6 +355,7 @@ fun createFacetText(
                             end = end
                         )
                     }
+
                     is MentionFeature -> {
                         addStyle(
                             style = SpanStyle(
@@ -362,6 +372,7 @@ fun createFacetText(
                             end = end
                         )
                     }
+
                     is LinkFeature -> {
                         addStyle(
                             style = SpanStyle(
@@ -395,30 +406,39 @@ fun FacetText(
         color = MaterialTheme.colorScheme.onSurface
     )
 
-    androidx.compose.foundation.text.ClickableText(
+    val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
+
+    Text(
         text = annotatedText,
         style = textStyle,
-        onClick = { offset ->
-            // Check for tag annotations at clicked position
-            annotatedText.getStringAnnotations(tag = "tag", start = offset, end = offset)
-                .firstOrNull()?.let { annotation ->
-                    onTagClick(annotation.item)
-                    return@ClickableText
-                }
+        onTextLayout = { layoutResult.value = it },
+        modifier = Modifier.pointerInput(Unit) {
+            detectTapGestures { offset ->
+                layoutResult.value?.let { textLayout ->
+                    val position = textLayout.getOffsetForPosition(offset)
 
-            // Check for mention annotations
-            annotatedText.getStringAnnotations(tag = "mention", start = offset, end = offset)
-                .firstOrNull()?.let { annotation ->
-                    onMentionClick(annotation.item)
-                    return@ClickableText
-                }
+                    // Check for tag annotations at clicked position
+                    annotatedText.getStringAnnotations(tag = "tag", start = position, end = position)
+                        .firstOrNull()?.let { annotation ->
+                            onTagClick(annotation.item)
+                            return@detectTapGestures
+                        }
 
-            // Check for link annotations
-            annotatedText.getStringAnnotations(tag = "link", start = offset, end = offset)
-                .firstOrNull()?.let { annotation ->
-                    onLinkClick(annotation.item)
-                    return@ClickableText
+                    // Check for mention annotations
+                    annotatedText.getStringAnnotations(tag = "mention", start = position, end = position)
+                        .firstOrNull()?.let { annotation ->
+                            onMentionClick(annotation.item)
+                            return@detectTapGestures
+                        }
+
+                    // Check for link annotations
+                    annotatedText.getStringAnnotations(tag = "link", start = position, end = position)
+                        .firstOrNull()?.let { annotation ->
+                            onLinkClick(annotation.item)
+                            return@detectTapGestures
+                        }
                 }
+            }
         }
     )
 }

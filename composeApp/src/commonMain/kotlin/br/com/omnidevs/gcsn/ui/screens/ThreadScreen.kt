@@ -69,6 +69,7 @@ class ThreadScreen(private val postUri: String) : Screen {
         var error by remember { mutableStateOf<String?>(null) }
         var replyText by remember { mutableStateOf("") }
         var isSubmitting by remember { mutableStateOf(false) }
+        var isDeleting by remember { mutableStateOf(false) }
 
         // States for confirmation dialog
         var showConfirmationDialog by remember { mutableStateOf(false) }
@@ -87,6 +88,30 @@ class ThreadScreen(private val postUri: String) : Screen {
             dialogType = type
             pendingAction = action
             showConfirmationDialog = true
+        }
+
+        // Handle post deletion
+        val handleDeletePost = { postUri: String ->
+            coroutineScope.launch {
+                isDeleting = true
+                try {
+                    blueskyApi.deletePost(postUri)
+                    snackbarHostState.showSnackbar("Publicação excluída com sucesso")
+
+                    // If it was the main post, navigate back
+                    if (postUri == ThreadScreen@ this@ThreadScreen.postUri) {
+                        navigator.pop()
+                    } else {
+                        // Otherwise refresh the thread
+                        threadView =
+                            blueskyApi.getThreadView(ThreadScreen@ this@ThreadScreen.postUri)
+                    }
+                } catch (e: Exception) {
+                    snackbarHostState.showSnackbar("Falha ao excluir publicação: ${e.message}")
+                } finally {
+                    isDeleting = false
+                }
+            }
         }
 
         LaunchedEffect(postUri) {
@@ -259,7 +284,12 @@ class ThreadScreen(private val postUri: String) : Screen {
                                                         navigator.push(ProfileScreen(did))
                                                     },
                                                     onLinkClick = { uri -> },
-                                                    showConfirmationDialog = showDialog
+                                                    showConfirmationDialog = showDialog,
+                                                    onDeleteClick = { postUri ->
+                                                        handleDeletePost(
+                                                            postUri
+                                                        )
+                                                    }
                                                 )
                                             }
                                             ThreadConnector()
@@ -315,7 +345,8 @@ class ThreadScreen(private val postUri: String) : Screen {
                                                 navigator.push(ProfileScreen(did))
                                             },
                                             onLinkClick = { uri -> },
-                                            showConfirmationDialog = showDialog
+                                            showConfirmationDialog = showDialog,
+                                            onDeleteClick = { postUri -> handleDeletePost(postUri) }
                                         )
                                     }
                                 }
@@ -370,7 +401,12 @@ class ThreadScreen(private val postUri: String) : Screen {
                                                     navigator.push(ProfileScreen(did))
                                                 },
                                                 onLinkClick = { uri -> },
-                                                showConfirmationDialog = showDialog
+                                                showConfirmationDialog = showDialog,
+                                                onDeleteClick = { postUri ->
+                                                    handleDeletePost(
+                                                        postUri
+                                                    )
+                                                }
                                             )
                                         }
                                         Spacer(modifier = Modifier.height(12.dp))
@@ -385,7 +421,7 @@ class ThreadScreen(private val postUri: String) : Screen {
                     }
                 }
 
-                if (isSubmitting) {
+                if (isSubmitting || isDeleting) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()

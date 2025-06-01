@@ -1,5 +1,6 @@
 package br.com.omnidevs.gcsn.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import br.com.omnidevs.gcsn.model.Feed
@@ -32,6 +34,7 @@ class HomeScreen : Screen {
         val navigator = LocalNavigator.current
         var feed by remember { mutableStateOf<Feed?>(null) }
         var isLoading by remember { mutableStateOf(true) }
+        var isDeleting by remember { mutableStateOf(false) }
         var error by remember { mutableStateOf<String?>(null) }
         var currentTab by remember { mutableStateOf<TabItem>(TabItem.HomeTab) }
         val blueskyApi = remember { BlueskyApi() }
@@ -55,6 +58,29 @@ class HomeScreen : Screen {
             dialogType = type
             pendingAction = action
             showConfirmationDialog = true
+        }
+
+        // Function to handle post deletion
+        val handleDeletePost = { postUri: String ->
+            coroutineScope.launch {
+                isDeleting = true
+                try {
+                    // Call API to delete post
+                    blueskyApi.deletePost(postUri)
+
+                    // Remove the deleted post from the feed
+                    feed = feed?.copy(
+                        feed = feed?.feed?.filter { it.post.uri != postUri } ?: listOf(),
+                        cursor = feed?.cursor
+                    )
+
+                    snackbarHostState.showSnackbar("Publicação excluída com sucesso")
+                } catch (e: Exception) {
+                    snackbarHostState.showSnackbar("Falha ao excluir publicação: ${e.message}")
+                } finally {
+                    isDeleting = false
+                }
+            }
         }
 
         val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -221,7 +247,8 @@ class HomeScreen : Screen {
                                         navigator?.push(ProfileScreen(did))
                                     },
                                     onLinkClick = { uri -> },
-                                    showConfirmationDialog = showDialog
+                                    showConfirmationDialog = showDialog,
+                                    onDeleteClick = { postUri -> handleDeletePost(postUri) }
                                 )
                             }
 
@@ -258,6 +285,18 @@ class HomeScreen : Screen {
                                 }
                             }
                         )
+                    }
+                }
+
+                // Show loading overlay during deletion
+                if (isDeleting) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
                 }
 
